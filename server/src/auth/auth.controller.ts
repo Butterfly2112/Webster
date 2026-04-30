@@ -11,19 +11,26 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
+import {
+  PasswordChangeDto,
+  RegisterDto,
+  RequestPasswordResetDto,
+} from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
 import { type Response, type Request } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { LoginResponseDto } from './dto/auth-response.dto';
@@ -151,5 +158,35 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
+  }
+
+  @Post('reset-password-request')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiOkResponse({
+    description:
+      'Password reset request were made successfully. Link with reset token were sent on the email',
+  })
+  @ApiBody({ type: RequestPasswordResetDto })
+  @ApiNotFoundResponse({ description: 'User with such email not found' })
+  async resetPasswordRequest(@Body() dto: RequestPasswordResetDto) {
+    await this.authService.requestPasswordReset(dto.email);
+    return {
+      message: 'Please check your email box',
+    };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Password reset' })
+  @ApiOkResponse({ description: 'Password reset successfully' })
+  @ApiBody({ type: PasswordChangeDto })
+  @ApiNotFoundResponse({ description: 'Token was not found in the database' })
+  @ApiForbiddenResponse({ description: 'Reset Token has expired' })
+  async resetPassword(@Body() dto: PasswordChangeDto) {
+    await this.authService.passwordChange(dto.token, dto.password);
+    return {
+      message: 'Password reset successfully. Please proceed to login',
+    };
   }
 }

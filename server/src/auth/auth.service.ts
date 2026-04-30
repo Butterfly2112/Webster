@@ -3,7 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -80,6 +80,8 @@ export class AuthService {
           googleId: googleUser.googleId,
           avatar: googleUser.avatar,
         });
+
+        this.emailService.sendWelcomeMessageGoogle(user.username, user.email);
       }
     }
 
@@ -126,7 +128,7 @@ export class AuthService {
   async createEmailToken(userId: number): Promise<string> {
     const token = crypto.randomBytes(32).toString('hex');
     await this.prisma.token.create({
-      data: { type: 'emailChange', token, user_id: userId },
+      data: { type: TokenType.emailChange, token, user_id: userId },
     });
     return token;
   }
@@ -154,14 +156,14 @@ export class AuthService {
     await this.prisma.token.deleteMany({
       where: {
         user_id: user.id,
-        type: 'refreshJwtToken',
+        type: TokenType.refreshJwtToken,
         expires_at: { lt: new Date() },
       },
     });
 
     await this.prisma.token.create({
       data: {
-        type: 'refreshJwtToken',
+        type: TokenType.refreshJwtToken,
         token: tokenHash,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         user_id: user.id,
@@ -175,5 +177,62 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const user = await this.userService.findByloginOrEmail(email);
+    if (!user) {
+      throw new NotFoundException('User wiht such email not found');
+    }
+
+    await this.prisma.token.deleteMany({
+      where: { type: TokenType.passwordChange, user_id: user.id },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.prisma.token.create({
+      data: {
+        type: TokenType.passwordChange,
+        token,
+        user_id: user.id,
+        expires_at: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
+
+    this.emailService.sendPasswordReset(user.username, user.email, token);
+  }
+
+  async passwordChange(token: string, newPassword: string) {
+    const found_token = await this.prisma.token.findUnique({
+      where: { type: TokenType.passwordChange, token: token },
+      select: { user_id: true, expires_at: true },
+    });
+    if (!found_token) {
+      throw new NotFoundException('Invalid token');
+    }
+
+    if (
+      found_token.expires_at !== null &&
+      found_token.expires_at < new Date(Date.now())
+    ) {
+      await this.prisma.token.deleteMany({
+        where: { type: TokenType.passwordChange, user_id: found_token.user_id },
+      });
+      throw new ForbiddenException(
+        'Reset Token has expired. Please request password reset again',
+      );
+    }
+
+    await this.prisma.token.deleteMany({
+      where: {
+        OR: [
+          { type: TokenType.passwordChange },
+          { type: TokenType.refreshJwtToken },
+        ],
+        user_id: found_token.user_id,
+      },
+    });
+
+    await this.userService.resetPassword(found_token.user_id, newPassword);
   }
 }

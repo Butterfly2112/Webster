@@ -1,3 +1,4 @@
+import { ApiProperty, OmitType, PickType } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
@@ -30,4 +31,13 @@ export class RegisterDto {
     message: 'Password must contain uppercase, lowercase and number',
   })
   password: string;
+}
+
+export class RequestPasswordResetDto extends PickType(RegisterDto, ['email']) {}
+
+export class PasswordChangeDto extends PickType(RegisterDto, ['password']) {
+  @ApiProperty({ example: 'eyJhbGci...' })
+  @IsString()
+  @IsNotEmpty()
+  token: string;
 }

@@ -43,6 +43,15 @@ export class UserService {
       });
   }
 
+  async resetPassword(userId: number, newPassword: string): Promise<void> {
+    const password_hash = await bcrypt.hash(newPassword, 12);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password_hash: password_hash },
+    });
+  }
+
   async findByloginOrEmail(loginOrEmail: string): Promise<User | null> {
     return this.prisma.user.findFirst({
       where: { OR: [{ login: loginOrEmail }, { email: loginOrEmail }] },
