@@ -93,7 +93,7 @@ export class AuthController {
   @UseGuards(JwtAccessGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout current device' })
-  @ApiOkResponse({ description: '' })
+  @ApiOkResponse({ description: 'User logout successfully' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.cookies?.refreshToken);
 
@@ -115,6 +115,9 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
+  @ApiOkResponse({
+    description: 'Redirects user to the login page with token or with error',
+  })
   async googleCallback(@Req() req: any, @Res() res: Response) {
     const frontendUrl =
       this.configService.get('FRONTEND_URL') ?? 'http://localhost:3001';

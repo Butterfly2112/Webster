@@ -7,6 +7,7 @@ import { RegisterDto } from 'src/auth/dto/register.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import bcrypt from 'bcrypt';
 import { User } from '@prisma/client';
+import { SafeUserDto } from 'src/auth/dto/auth-response.dto';
 
 @Injectable()
 export class UserService {
@@ -93,5 +94,22 @@ export class UserService {
         is_email_verified: true,
       },
     });
+  }
+
+  async getUserProfile(userId: number): Promise<SafeUserDto> {
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      id: user.id,
+      login: user.login,
+      username: user.username,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      created_at: user.created_at,
+    };
   }
 }
