@@ -3,7 +3,23 @@ import type { LoginResponseDto } from './types';
 
 const API_URL = '/api/auth';
 
-let refreshPromise: Promise<LoginResponseDto> | null = null;
+let isRefreshing = false;
+
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: Error) => void;
+}> = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token as string);
+    }
+  });
+  failedQueue = [];
+};
 
 async function readErrorMessage(res: Response): Promise<string> {
   try {
@@ -32,24 +48,17 @@ async function readErrorMessage(res: Response): Promise<string> {
 }
 
 async function refreshSession(): Promise<LoginResponseDto> {
-  if (!refreshPromise) {
-    refreshPromise = fetch(`${API_URL}/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error((await readErrorMessage(res)) || 'Unable to refresh session');
-        }
+  const res = await fetch(`${API_URL}/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
 
-        return res.json() as Promise<LoginResponseDto>;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+  if (!res.ok) {
+    throw new Error((await readErrorMessage(res)) || 'Unable to refresh session');
   }
 
-  return refreshPromise;
+  const data = (await res.json()) as LoginResponseDto;
+  return data;
 }
 
 export async function customFetch(
@@ -79,19 +88,38 @@ export async function customFetch(
     return response;
   }
 
-  try {
-    const data = await refreshSession();
-    useAuthStore.getState().setAuth(data.user, data.access_token);
+  if (!isRefreshing) {
+    isRefreshing = true;
 
-    headers.set('Authorization', `Bearer ${data.access_token}`);
+    try {
+      const data = await refreshSession();
+
+      useAuthStore.getState().setAuth(data.user, data.access_token);
+      processQueue(null, data.access_token);
+
+      headers.set('Authorization', `Bearer ${data.access_token}`);
+      response = await fetch(input, {
+        ...options,
+        headers,
+        credentials: options.credentials ?? 'include',
+      });
+    } catch (error) {
+      useAuthStore.getState().clearAuth();
+      processQueue(error as Error, null);
+    } finally {
+      isRefreshing = false;
+    }
+  } else {
+    const newToken = await new Promise<string>((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    });
+
+    headers.set('Authorization', `Bearer ${newToken}`);
     response = await fetch(input, {
       ...options,
       headers,
       credentials: options.credentials ?? 'include',
     });
-  } catch (error) {
-    useAuthStore.getState().clearAuth();
-    throw error;
   }
 
   return response;

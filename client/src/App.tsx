@@ -24,8 +24,6 @@ const queryClient = new QueryClient();
 export default function App() {
   const user = useAuthStore(s => s.user);
   const hydrate = useAuthStore(s => s.hydrate);
-  const setAuth = useAuthStore(s => s.setAuth);
-  const clearAuth = useAuthStore(s => s.clearAuth);
   
   useEffect(() => {
     hydrate();
@@ -39,20 +37,21 @@ export default function App() {
     let active = true;
 
     const keepSessionAlive = async () => {
+      if (!active) return;
+      
       try {
         const data = await refreshSession();
 
         if (active) {
-          setAuth(data.user, data.access_token);
+          useAuthStore.getState().setAuth(data.user, data.access_token);
         }
-      } catch {
+      } catch (error) {
+        console.log('[SESSION] Failed to refresh token', error);
         if (active) {
-          clearAuth();
+          useAuthStore.getState().clearAuth();
         }
       }
     };
-
-    void keepSessionAlive();
 
     const intervalId = window.setInterval(keepSessionAlive, 14 * 60 * 1000);
 
@@ -60,7 +59,7 @@ export default function App() {
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [user, setAuth, clearAuth]);
+  }, [user]);
   
   return (
     <QueryClientProvider client={queryClient}>
