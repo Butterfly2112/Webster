@@ -121,7 +121,7 @@ export class AuthService {
         where: { id: record.user_id },
         data: { is_email_verified: true },
       }),
-      this.prisma.token.delete({ where: { id: record.id } }),
+      this.prisma.token.deleteMany({ where: { id: record.id } }),
     ]);
   }
 
