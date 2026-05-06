@@ -51,42 +51,79 @@ export default function EmailConfirmed() {
     }
 
     confirmEmail(token)
-      .then((res) => {
-        setStatus('success');
-        setMessage(res.message || 'Your account has been successfully confirmed.');
-        setConfirmedToken(token);
-      })
-      .catch((err) => {
-        if (getConfirmedTokens().includes(token)) {
+        .then((res) => {
           setStatus('success');
-          setMessage('Your account has already been successfully confirmed.');
-          return;
-        }
+          setMessage(res.message || 'Your account has been successfully confirmed.');
+          setConfirmedToken(token);
+        })
+        .catch((err) => {
+          if (getConfirmedTokens().includes(token)) {
+            setStatus('success');
+            setMessage('Your account has already been successfully confirmed.');
+            return;
+          }
 
-        setStatus('error');
-        setMessage(
-          err instanceof Error && err.message.toLowerCase().includes('invalid token')
-            ? 'Your account has already been successfully confirmed.'
-            : err instanceof Error
-              ? err.message
-              : 'Invalid or expired token.',
-        );
-      });
+          setStatus('error');
+          setMessage(
+              err instanceof Error && err.message.toLowerCase().includes('invalid token')
+                  ? 'Your account has already been successfully confirmed.'
+                  : err instanceof Error
+                      ? err.message
+                      : 'Invalid or expired token.',
+          );
+        });
   }, [searchParams]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      {status === 'pending' && <p>Confirming your email...</p>}
-      {status === 'success' && <>
-        <h1>Email Confirmed</h1>
-        <p>{message}</p>
-        <Link to="/login" style={{ marginTop: 20, color: '#1976d2', textDecoration: 'underline' }}>Go to Login</Link>
-      </>}
-      {status === 'error' && <>
-        <h1>Email Confirmation Failed</h1>
-        <p>{message}</p>
-        <Link to="/login" style={{ marginTop: 20, color: '#1976d2', textDecoration: 'underline' }}>Go to Login</Link>
-      </>}
-    </div>
+      <div className="login-page" style={{ justifyContent: 'center', background: 'var(--main-bg)', padding: '20px' }}>
+        <div className="modal-content" style={{ textAlign: 'center', width: '100%', maxWidth: '450px', margin: 'auto' }}>
+
+          {status === 'pending' && (
+              <div style={{ padding: '20px 0' }}>
+                <div className="feature-icon" style={{ margin: '0 auto 20px auto', animation: 'fadeIn 1s infinite alternate' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                </div>
+                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px' }}>Confirming...</h2>
+                <p style={{ color: 'var(--text-light)', margin: 0 }}>Please wait while we verify your email.</p>
+              </div>
+          )}
+
+          {status === 'success' && (
+              <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
+                <div className="feature-icon" style={{ margin: '0 auto 20px auto', background: '#dcfce7', color: '#16a34a' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px', fontSize: '24px', fontWeight: 700 }}>Email Confirmed!</h2>
+                <p style={{ color: 'var(--text-light)', marginBottom: '30px', lineHeight: '1.6' }}>{message}</p>
+                <Link to="/login" className="button-agree" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
+                  Go to Login
+                </Link>
+              </div>
+          )}
+
+          {status === 'error' && (
+              <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
+                <div className="feature-icon" style={{ margin: '0 auto 20px auto', background: 'var(--error-bg)', color: 'var(--error-color)' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+                <h2 style={{ color: 'var(--error-color)', marginBottom: '15px', fontSize: '24px', fontWeight: 700 }}>Confirmation Failed</h2>
+                <div className="error-msg" style={{ marginBottom: '30px' }}>
+                  {message}
+                </div>
+                <Link to="/login" className="button-secondary" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
+                  Back to Login
+                </Link>
+              </div>
+          )}
+
+        </div>
+      </div>
   );
 }

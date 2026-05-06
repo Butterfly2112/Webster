@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useMutation } from "@tanstack/react-query";
-import axios from 'axios';
+import { customFetch } from '../api/http';
 import type {User} from "../api/types.ts";
 
 export interface SafeUserDto {
@@ -43,12 +43,25 @@ export default function Header() {
 
     const mutation = useMutation({
         mutationFn: async (data: { login: string; avatar_url: string }) => {
-            const token = localStorage.getItem('accessToken');
-
-            const response = await axios.patch<SafeUserDto>('/api/user/profile', data, {
-                headers: { Authorization: `Bearer ${token}` }
+            const response = await customFetch('/api/user/profile', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
             });
-            return response.data;
+
+            if (!response.ok) {
+                let errorMessage = 'Update failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                }
+                throw new Error(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
+            }
+
+            return response.json() as Promise<SafeUserDto>;
         },
         onSuccess: (updatedUser: SafeUserDto) => {
             const currentToken = localStorage.getItem('accessToken') || '';
@@ -63,8 +76,7 @@ export default function Header() {
             setUpdateError('');
         },
         onError: (e: any) => {
-            const message = e.response?.data?.message || 'Update failed';
-            setUpdateError(message);
+            setUpdateError(e.message || 'Update failed');
         }
     });
 
@@ -179,7 +191,7 @@ export default function Header() {
                             </div>
 
 
-                            <div className="input-group">
+                            <div className="input-group" style={{  padding: '15px 0', borderTop: '1px solid #e2e8f0' }}>
                                 <label>Login</label>
                                 <input
                                     type="text"
@@ -197,6 +209,7 @@ export default function Header() {
                                     type="submit"
                                     className="button-agree"
                                     disabled={mutation.isPending}
+                                    style={{ marginRight: '100px' }}
                                 >
                                     {mutation.isPending ? 'Saving...' : 'Save Changes'}
                                 </button>
