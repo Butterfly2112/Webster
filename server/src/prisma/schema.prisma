@@ -23,7 +23,10 @@ model User {
   is_email_verified Boolean  @default(false)
   created_at        DateTime @default(now())
 
-  tokens Token[]
+  tokens   Token[]
+  projects Project[]
+  assets   Asset[]
+  fonts    Font[]
 
   @@index([email])
   @@index([login])
@@ -40,4 +43,64 @@ model Token {
   user_id Int
 
   @@index([user_id, type])
+}
+
+model Project {
+  id            Int      @id @default(autoincrement())
+  title         String
+  description   String?
+  canvas_data   Json     @default("{}")
+  width         Int      @default(800)
+  height        Int      @default(600)
+  thumbnail_url String?
+  is_template   Boolean  @default(false)
+  is_public     Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  owner_id Int?
+
+  assets Asset[]
+
+  @@index([owner_id])
+  @@index([is_template])
+}
+
+model Asset {
+  id            Int       @id @default(autoincrement())
+  type          AssetType
+  url           String
+  public_id     String
+  original_name String
+  file_size     Int
+  created_at    DateTime  @default(now())
+
+  owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  owner_id Int?
+
+  project    Project? @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project_id Int?
+
+  @@index([owner_id])
+}
+
+model Font {
+  id         Int      @id @default(autoincrement())
+  name       String
+  url        String
+  public_id  String
+  format     String
+  is_default Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  owner_id Int?
+
+  @@index([owner_id])
+}
+
+enum AssetType {
+  image
+  background
 }

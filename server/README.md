@@ -34,6 +34,10 @@ PORT_FOR_EMAIL=5173 для посилання на листах
 GOOGLE_CLIENT_ID=id_для_авторизації_з_гугл
 GOOGLE_CLIENT_SECRET=секрет_для_авторизації_гугл
 GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+
+CLOUDINARY_CLOUD_NAME=твоє_імя
+CLOUDINARY_API_KEY=твій_ключ
+CLOUDINARY_API_SECRET=твій_секрет
 ```
 
 4. Встановити залежності та налаштувати бд:
