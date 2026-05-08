@@ -12,6 +12,11 @@ enum TokenType {
   passwordChange
 }
 
+enum AssetType {
+  image
+  background
+}
+
 model User {
   id                Int      @id @default(autoincrement())
   login             String   @unique
@@ -61,10 +66,23 @@ model Project {
   owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   owner_id Int?
 
-  assets Asset[]
+  assets  Asset[]
+  history ProjectHistory[]
 
   @@index([owner_id])
   @@index([is_template])
+}
+
+model ProjectHistory {
+  id          Int      @id @default(autoincrement())
+  canvas_data Json
+  version     Int
+  created_at  DateTime @default(now())
+
+  project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project_id Int
+
+  @@index([project_id])
 }
 
 model Asset {
@@ -98,9 +116,4 @@ model Font {
   owner_id Int?
 
   @@index([owner_id])
-}
-
-enum AssetType {
-  image
-  background
 }
