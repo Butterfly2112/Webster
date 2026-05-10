@@ -42,11 +42,9 @@ export class UserController {
   @ApiOkResponse({ type: SafeUserDto })
   @UseGuards(JwtAccessGuard)
   async updateProfile(
-    @CurrentUser() user: any,
+    @CurrentUser('sub') userId: number,
     @Body() dto: UpdateUserDto,
   ) {
-    const userId = Number(user?.id || user?.sub);
-
     return await this.userService.update(userId, dto);
   }
 }

@@ -51,16 +51,17 @@ model Token {
 }
 
 model Project {
-  id            Int      @id @default(autoincrement())
-  title         String
-  description   String?
-  canvas_data   Json     @default("{}")
-  width         Int      @default(800)
-  height        Int      @default(600)
-  thumbnail_url String?
-  is_template   Boolean  @default(false)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  title               String
+  description         String?
+  canvas_data         Json     @default("{}")
+  width               Int      @default(800)
+  height              Int      @default(600)
+  thumbnail_url       String?
+  thumbnail_public_id String?
+  is_template         Boolean  @default(false)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   owner_id Int?
@@ -73,10 +74,12 @@ model Project {
 }
 
 model ProjectHistory {
-  id          Int      @id @default(autoincrement())
-  canvas_data Json
-  version     Int
-  created_at  DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  canvas_data         Json
+  version             Int
+  created_at          DateTime @default(now())
+  thumbnail_url       String?
+  thumbnail_public_id String?
 
   project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
   project_id Int

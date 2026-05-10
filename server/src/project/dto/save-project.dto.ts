@@ -63,6 +63,9 @@ export class CreateProjectDto {
   @IsOptional()
   thumbnailUrl?: string;
 
+  @IsOptional()
+  thumbnail_public_id?: string;
+
   @ApiProperty({
     description: 'The id of the template from which project being created.',
     required: false,
@@ -86,6 +89,7 @@ export class UpdateProjectDto extends OmitType(CreateProjectDto, ['title']) {
 
 export class CreateProjectDtoD extends OmitType(CreateProjectDto, [
   'thumbnailUrl',
+  'thumbnail_public_id',
 ]) {
   @ApiProperty({
     description: 'The current thumbnail of the project',
@@ -96,6 +100,7 @@ export class CreateProjectDtoD extends OmitType(CreateProjectDto, [
 
 export class UpdateProjectDtoD extends OmitType(UpdateProjectDto, [
   'thumbnailUrl',
+  'thumbnail_public_id',
 ]) {
   @ApiProperty({
     description: 'The current thumbnail of the project',

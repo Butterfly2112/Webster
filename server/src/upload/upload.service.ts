@@ -6,6 +6,7 @@ import {
 } from 'cloudinary';
 import { Readable } from 'stream';
 import 'multer';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -28,6 +29,8 @@ const MAX_FONT_SIZE = 5 * 1024 * 1024;
 
 @Injectable()
 export class UploadService {
+  constructor(private prisma: PrismaService) {}
+
   private upload(
     buffer: Buffer,
     folder: string,
@@ -69,9 +72,11 @@ export class UploadService {
     };
   }
 
-  async uploadThumbnail(file: Express.Multer.File): Promise<{ url: string }> {
+  async uploadThumbnail(
+    file: Express.Multer.File,
+  ): Promise<{ url: string; public_id: string }> {
     const result = await this.upload(file.buffer, 'webster/thumbnails');
-    return { url: result.secure_url };
+    return { url: result.secure_url, public_id: result.public_id };
   }
 
   async uploadAvatar(

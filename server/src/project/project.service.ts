@@ -4,10 +4,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateProjectDto } from './dto/save-project.dto';
+import { CreateProjectDto, UpdateProjectDto } from './dto/save-project.dto';
 import { UserService } from 'src/user/user.service';
 import { Project } from '@prisma/client';
-import { ProjectCardDto, SafeProjectDto } from './dto/safe-project.dto';
+import {
+  CardProjectHistoryDto,
+  ProjectCardDto,
+  SafeProjectDto,
+} from './dto/safe-project.dto';
+import { UploadService } from 'src/upload/upload.service';
 
 const EMPTY_CANVAS = {
   className: 'Stage',
@@ -15,11 +20,14 @@ const EMPTY_CANVAS = {
   children: [{ className: 'Layer', attrs: {}, children: [] }],
 };
 
+const MAX_HISTORY_VERSIONS = 20;
+
 @Injectable()
 export class ProjectService {
   constructor(
     private prisma: PrismaService,
     private userService: UserService,
+    private uploadService: UploadService,
   ) {}
 
   async createProject(
@@ -36,6 +44,7 @@ export class ProjectService {
       });
 
       if (!template || !template.is_template) {
+        await this.safeDeleteFile(dto.thumbnail_public_id);
         throw new NotFoundException('Template not found');
       }
 
@@ -43,6 +52,7 @@ export class ProjectService {
       const isOwnTemplate = template.owner_id === userId;
 
       if (!isSystemTemplate && !isOwnTemplate) {
+        await this.safeDeleteFile(dto.thumbnail_public_id);
         throw new ForbiddenException('No access to this template');
       }
 
@@ -57,6 +67,7 @@ export class ProjectService {
         width: dto.width ?? 800,
         height: dto.height ?? 600,
         thumbnail_url: dto.thumbnailUrl,
+        thumbnail_public_id: dto.thumbnail_public_id,
         is_template: false,
         owner_id: user.id,
       },
@@ -102,6 +113,173 @@ export class ProjectService {
     });
 
     return templates.map(this.toProjectCard);
+  }
+
+  async updateProject(
+    projectId: number,
+    dto: UpdateProjectDto,
+    userId: number,
+  ): Promise<SafeProjectDto> {
+    const currentProject = await this.checkRights(
+      projectId,
+      userId,
+      dto.thumbnail_public_id,
+    );
+
+    if (dto.canvasData) {
+      await this.saveHistorySnapshot(
+        projectId,
+        currentProject.canvas_data as object,
+        currentProject.thumbnail_url,
+        currentProject.thumbnail_public_id,
+      );
+    }
+
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.canvasData !== undefined && { canvas_data: dto.canvasData }),
+        ...(dto.thumbnailUrl !== undefined && {
+          thumbnail_url: dto.thumbnailUrl,
+        }),
+        ...(dto.thumbnail_public_id !== undefined && {
+          thumbnail_public_id: dto.thumbnail_public_id,
+        }),
+        ...(dto.width !== undefined && { width: dto.width }),
+        ...(dto.height !== undefined && { height: dto.height }),
+        ...(dto.isTemplate !== undefined && { is_template: dto.isTemplate }),
+      },
+    });
+
+    return this.toSafeProject(updated);
+  }
+
+  async getProjectHistory(
+    projectId: number,
+    userId: number,
+  ): Promise<CardProjectHistoryDto[]> {
+    await this.checkRights(projectId, userId);
+
+    return this.prisma.projectHistory.findMany({
+      where: { project_id: projectId },
+      orderBy: { version: 'desc' },
+      select: {
+        id: true,
+        version: true,
+        thumbnail_url: true,
+        created_at: true,
+      },
+    });
+  }
+
+  async restoreVersion(
+    projectId: number,
+    historyId: number,
+    userId: number,
+  ): Promise<SafeProjectDto> {
+    const currentProject = await this.checkRights(projectId, userId);
+
+    const historyEntry = await this.prisma.projectHistory.findUnique({
+      where: { id: historyId },
+    });
+
+    if (!historyEntry || historyEntry.project_id !== projectId) {
+      throw new NotFoundException('History version not found');
+    }
+
+    await this.saveHistorySnapshot(
+      projectId,
+      currentProject.canvas_data as object,
+    );
+
+    const restored = await this.prisma.project.update({
+      where: { id: projectId },
+      data: { canvas_data: historyEntry.canvas_data as object },
+    });
+
+    return this.toSafeProject(restored);
+  }
+
+  private async checkRights(
+    projectId: number,
+    userId: number,
+    thumbnailPublicId?: string,
+  ): Promise<Project> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) {
+      await this.safeDeleteFile(thumbnailPublicId);
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.owner_id !== userId) {
+      await this.safeDeleteFile(thumbnailPublicId);
+      throw new ForbiddenException('Access denied');
+    }
+
+    return project;
+  }
+
+  private async safeDeleteFile(
+    public_id: string | null | undefined,
+  ): Promise<void> {
+    if (!public_id) return;
+    try {
+      await this.uploadService.deleteFile(public_id);
+    } catch {
+      console.warn(`Failed to delete Cloudinary file: ${public_id}`);
+    }
+  }
+
+  private async saveHistorySnapshot(
+    projectId: number,
+    canvasData: object,
+    thumbnail_url?: string | null,
+    thumbnail_public_id?: string | null,
+  ): Promise<void> {
+    const lastHistory = await this.prisma.projectHistory.findFirst({
+      where: { id: projectId },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+
+    const nextVersion = (lastHistory?.version ?? 0) + 1;
+
+    await this.prisma.projectHistory.create({
+      data: {
+        project_id: projectId,
+        canvas_data: canvasData,
+        version: nextVersion,
+        thumbnail_url: thumbnail_url,
+        thumbnail_public_id: thumbnail_public_id,
+      },
+    });
+
+    const allVersions = await this.prisma.projectHistory.findMany({
+      where: { project_id: projectId },
+      orderBy: { version: 'desc' },
+      select: { id: true, thumbnail_public_id: true },
+    });
+
+    if (allVersions.length > MAX_HISTORY_VERSIONS) {
+      const versionsToDelete = allVersions.slice(MAX_HISTORY_VERSIONS);
+
+      const idsToDelete = versionsToDelete.map((h) => h.id);
+      const thumbnailsToDelete = versionsToDelete
+        .map((h) => h.thumbnail_public_id)
+        .filter(Boolean);
+
+      await this.prisma.projectHistory.deleteMany({
+        where: { id: { in: idsToDelete } },
+      });
+
+      await Promise.allSettled(
+        thumbnailsToDelete.map((id) => this.safeDeleteFile(id)),
+      );
+    }
   }
 
   private toSafeProject(project: Project): SafeProjectDto {

@@ -20,14 +20,6 @@ export class UploadController {
     return this.uploadService.uploadImage(file);
   }
 
-  @Post('thumbnail')
-  @ApiOperation({ summary: 'Upload project thumbnail' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
-  async uploadThumbnail(@UploadedFile() file: Express.Multer.File) {
-    return this.uploadService.uploadThumbnail(file);
-  }
-
   @Post('avatar')
   @ApiOperation({ summary: 'Upload user avatar' })
   @ApiConsumes('multipart/form-data')

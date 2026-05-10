@@ -67,3 +67,30 @@ export class ProjectCardDto extends OmitType(SafeProjectDto, [
   'canvasData',
   'createdAt',
 ]) {}
+
+export class ProjectHistoryDto {
+  @ApiProperty({ description: 'Id of the version', example: 2 })
+  id: number;
+
+  @ApiProperty({ description: 'Version number', example: 4 })
+  version: number;
+
+  @ApiProperty({
+    description: 'Thumbnail image of the version',
+    example: 'https://example.com/image',
+  })
+  thumbnail_url: string | null;
+
+  @ApiProperty({
+    description:
+      'Json object containing all canvas information of current version',
+  })
+  canvas_data?: object;
+
+  @ApiProperty({ description: 'Date when this version were created' })
+  created_at: Date;
+}
+
+export class CardProjectHistoryDto extends OmitType(ProjectHistoryDto, [
+  'canvas_data',
+]) {}
