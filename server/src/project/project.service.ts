@@ -241,7 +241,7 @@ export class ProjectService {
     thumbnail_public_id?: string | null,
   ): Promise<void> {
     const lastHistory = await this.prisma.projectHistory.findFirst({
-      where: { id: projectId },
+      where: { project_id: projectId },
       orderBy: { version: 'desc' },
       select: { version: true },
     });

@@ -29,8 +29,6 @@ const MAX_FONT_SIZE = 5 * 1024 * 1024;
 
 @Injectable()
 export class UploadService {
-  constructor(private prisma: PrismaService) {}
-
   private upload(
     buffer: Buffer,
     folder: string,

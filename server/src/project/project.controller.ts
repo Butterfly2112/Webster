@@ -27,6 +27,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import {
   CreateProjectDto,
   CreateProjectDtoD,
+  RestoreVersionDto,
   UpdateProjectDto,
 } from './dto/save-project.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -95,7 +96,7 @@ export class ProjectController {
   @UseInterceptors(FileInterceptor('file'))
   async updateProject(
     @CurrentUser('sub') userId: number,
-    @Param('id') projectId: number,
+    @Param('id', ParseIntPipe) projectId: number,
     @Body() dto: UpdateProjectDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -135,7 +136,7 @@ export class ProjectController {
   @ApiOkResponse({ type: CardProjectHistoryDto, isArray: true })
   @Get(':id/version')
   async getAllVersionsOfProject(
-    @Param('id') projectId: number,
+    @Param('id', ParseIntPipe) projectId: number,
     @CurrentUser('sub') userId: number,
   ) {
     return await this.projectService.getProjectHistory(projectId, userId);
@@ -143,11 +144,7 @@ export class ProjectController {
 
   @ApiOperation({ summary: 'Restore past version of project' })
   @ApiBody({
-    schema: {
-      type: 'number',
-      example: 123,
-      description: 'Version Id of the project which needs to be restored',
-    },
+    type: RestoreVersionDto,
   })
   @ApiNotFoundResponse({
     description: 'History version not found or Project not found',
@@ -156,13 +153,13 @@ export class ProjectController {
   @ApiOkResponse({ type: SafeProjectDto })
   @Patch(':id/restore-version')
   async restoreVersion(
-    @Param('id') projectId: number,
+    @Param('id', ParseIntPipe) projectId: number,
     @CurrentUser('sub') userId: number,
-    @Body() historyId: number,
+    @Body() dto: RestoreVersionDto,
   ) {
     return await this.projectService.restoreVersion(
       projectId,
-      historyId,
+      dto.historyId,
       userId,
     );
   }

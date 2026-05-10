@@ -108,3 +108,12 @@ export class UpdateProjectDtoD extends OmitType(UpdateProjectDto, [
   @IsOptional()
   file?: string;
 }
+
+export class RestoreVersionDto {
+  @ApiProperty({
+    description: 'Version Id of the project which needs to be restored',
+    example: 12,
+  })
+  @IsInt()
+  historyId: number;
+}
