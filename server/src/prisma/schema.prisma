@@ -59,7 +59,6 @@ model Project {
   height        Int      @default(600)
   thumbnail_url String?
   is_template   Boolean  @default(false)
-  is_public     Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
