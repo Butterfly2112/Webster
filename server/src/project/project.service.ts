@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateProjectDto, UpdateProjectDto } from './dto/save-project.dto';
+import { CreateProjectDto } from './dto/save-project.dto';
 import { UserService } from 'src/user/user.service';
 import { Project } from '@prisma/client';
 import {
@@ -13,6 +13,7 @@ import {
   SafeProjectDto,
 } from './dto/safe-project.dto';
 import { UploadService } from 'src/upload/upload.service';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 const EMPTY_CANVAS = {
   className: 'Stage',
@@ -200,6 +201,27 @@ export class ProjectService {
     });
 
     return this.toSafeProject(restored);
+  }
+
+  async deleteProject(projectId: number, userId: number): Promise<void> {
+    const project = await this.checkRights(projectId, userId);
+
+    if (project.thumbnail_public_id) {
+      this.safeDeleteFile(project.thumbnail_public_id);
+    }
+    const files = await this.prisma.projectHistory.findMany({
+      where: { project_id: projectId },
+      select: { thumbnail_public_id: true },
+    });
+
+    files.map((public_id) => {
+      public_id ?? this.safeDeleteFile(public_id);
+    });
+
+    await this.prisma.projectHistory.deleteMany({
+      where: { project_id: projectId },
+    });
+    await this.prisma.project.delete({ where: { id: projectId } });
   }
 
   private async checkRights(

@@ -27,7 +27,7 @@ export class EmailService {
     });
 
     this.host = this.configService.get('HOST_FOR_EMAIL') || 'localhost';
-    this.port = this.configService.get('PORT_FOR_EMAIL') || '5173'; 
+    this.port = this.configService.get('PORT_FOR_EMAIL') || '5173';
   }
 
   private getHtmlTemplate(title: string, content: string): string {
@@ -152,5 +152,35 @@ export class EmailService {
     });
 
     console.log('Password reset email sent: ', info.messageId);
+  }
+
+  async sendEmailChangeRequest(
+    username: string,
+    newEmail: string,
+    token: string,
+  ): Promise<void> {
+    const url = this.host.startsWith('http')
+      ? `${this.host}/confirm-email-change?token=${token}`
+      : `http://${this.host}:${this.port}/confirm-email-change?token=${token}`;
+
+    const content = `
+      <p>Hello <b>${username}</b>,</p>
+      <p>We received a request to change your Webster account email address to this one. To confirm the change, please click the button below:</p>
+      ${this.getButtonHtml(url, 'Confirm Email Change')}
+      <div style="background-color: #fff1f2; padding: 15px; border-radius: 8px; border-left: 4px solid #e11d48; margin-top: 30px;">
+        <p style="margin: 0; color: #e11d48; font-size: 14px;">
+          <strong>Didn't request this?</strong> If you didn't ask to change your email, someone might have mistyped theirs. You can safely ignore this email.
+        </p>
+      </div>
+    `;
+
+    const info = await this.transporter.sendMail({
+      from: `"Webster" <${this.configService.get('SMTP_USER')}>`,
+      to: newEmail,
+      subject: 'Confirm your new email address - Webster',
+      html: this.getHtmlTemplate('Email Change Request', content),
+    });
+
+    console.log('Email change request sent: ', info.messageId);
   }
 }

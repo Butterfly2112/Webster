@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -19,17 +20,11 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
 import { ProjectService } from './project.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  CreateProjectDto,
-  CreateProjectDtoD,
-  RestoreVersionDto,
-  UpdateProjectDto,
-} from './dto/save-project.dto';
+import { CreateProjectDto, CreateProjectDtoD } from './dto/save-project.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access.guard';
 import { UploadService } from 'src/upload/upload.service';
@@ -38,6 +33,11 @@ import {
   ProjectCardDto,
   SafeProjectDto,
 } from './dto/safe-project.dto';
+import {
+  RestoreVersionDto,
+  UpdateProjectDto,
+  UpdateProjectDtoD,
+} from './dto/update-project.dto';
 
 @ApiTags('Project')
 @UseGuards(JwtAccessGuard)
@@ -59,7 +59,11 @@ export class ProjectController {
     return await this.projectService.getUserProjects(userId);
   }
 
-  @ApiOperation({ summary: 'Get all templates (system + own)' })
+  @ApiOperation({
+    summary: 'Get all templates (system + own)',
+    description:
+      'Returns array of templates. System templates first, then user templates',
+  })
   @ApiOkResponse({ type: ProjectCardDto, isArray: true })
   @Get('templates')
   async getTemplates(@CurrentUser('sub') userId: number) {
@@ -89,6 +93,7 @@ export class ProjectController {
   @ApiOperation({ summary: 'Update project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateProjectDtoD })
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
   @ApiOkResponse({ type: SafeProjectDto })
@@ -111,15 +116,16 @@ export class ProjectController {
 
   @ApiOperation({ summary: 'Create new project (optionally from template)' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateProjectDtoD })
   @ApiNotFoundResponse({ description: 'Template not found' })
   @ApiForbiddenResponse({ description: 'No access to this template' })
   @ApiOkResponse({ type: SafeProjectDto })
   @Post('create')
   @UseInterceptors(FileInterceptor('file'))
   async createNewProject(
-    @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateProjectDto,
     @CurrentUser('sub') userId: number,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     if (file) {
       const picture = await this.uploadService.uploadThumbnail(file);
@@ -162,5 +168,21 @@ export class ProjectController {
       dto.historyId,
       userId,
     );
+  }
+
+  @ApiOperation({ summary: 'Delete project and all its verions' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiNotFoundResponse({ description: 'Project not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiOkResponse({ description: 'Project was deleted successfully' })
+  @Delete(':id')
+  async deleteProject(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) projectId: number,
+  ) {
+    await this.projectService.deleteProject(projectId, userId);
+    return {
+      message: 'Project was deleted successfully',
+    };
   }
 }

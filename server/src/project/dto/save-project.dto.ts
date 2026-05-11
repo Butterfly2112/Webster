@@ -77,16 +77,6 @@ export class CreateProjectDto {
   sourceTemplateId?: number;
 }
 
-export class UpdateProjectDto extends OmitType(CreateProjectDto, ['title']) {
-  @IsOptional()
-  title?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  @Type(() => Boolean)
-  isTemplate?: boolean;
-}
-
 export class CreateProjectDtoD extends OmitType(CreateProjectDto, [
   'thumbnailUrl',
   'thumbnail_public_id',
@@ -96,24 +86,4 @@ export class CreateProjectDtoD extends OmitType(CreateProjectDto, [
   })
   @IsOptional()
   file?: string;
-}
-
-export class UpdateProjectDtoD extends OmitType(UpdateProjectDto, [
-  'thumbnailUrl',
-  'thumbnail_public_id',
-]) {
-  @ApiProperty({
-    description: 'The current thumbnail of the project',
-  })
-  @IsOptional()
-  file?: string;
-}
-
-export class RestoreVersionDto {
-  @ApiProperty({
-    description: 'Version Id of the project which needs to be restored',
-    example: 12,
-  })
-  @IsInt()
-  historyId: number;
 }
