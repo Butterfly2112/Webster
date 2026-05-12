@@ -22,8 +22,9 @@ export default function Header() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const [newLogin, setNewLogin] = useState(user?.login || '');
+    const [newUsername, setNewUsername] = useState(user?.username || '');
     const [newAvatar, setNewAvatar] = useState(user?.avatar_url || '');
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
     const [updateError, setUpdateError] = useState('');
 
@@ -34,21 +35,26 @@ export default function Header() {
 
     const openEditModal = () => {
         if (user) {
-            setNewLogin(user.login);
+            setNewUsername(user.username);
             setNewAvatar(user.avatar_url || '');
+            setAvatarFile(null);
             setUpdateError('');
             setIsModalOpen(true);
         }
     };
 
     const mutation = useMutation({
-        mutationFn: async (data: { login: string; avatar_url: string }) => {
+        mutationFn: async () => {
+            const formData = new FormData();
+            formData.append('username', newUsername);
+
+            if (avatarFile) {
+                formData.append('file', avatarFile);
+            }
+
             const response = await customFetch('/api/user/profile', {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
+                body: formData,
             });
 
             if (!response.ok) {
@@ -82,14 +88,11 @@ export default function Header() {
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
-
         if (user) {
-            mutation.mutate({
-                login: newLogin,
-                avatar_url: newAvatar
-            });
+            mutation.mutate();
         }
     };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -97,6 +100,8 @@ export default function Header() {
                 setUpdateError("File is too large (max 2MB)");
                 return;
             }
+
+            setAvatarFile(file);
 
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -138,7 +143,7 @@ export default function Header() {
                                     className="avatar"
                                     onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
                                 />
-                                <span className="username-text">{user.login}</span>
+                                <span className="username-text">{user.username}</span>
                             </div>
 
                             {isDropdownOpen && (
@@ -170,6 +175,7 @@ export default function Header() {
                         <form onSubmit={handleSave} className="edit-profile-form">
                             <div className="avatar-edit-section">
                                 <img
+                                    style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover' }}
                                     src={newAvatar || '/default-avatar.png'}
                                     alt="Preview"
                                     className="avatar-preview-big"
@@ -195,21 +201,27 @@ export default function Header() {
                                 <label>Login</label>
                                 <input
                                     type="text"
-                                    value={newLogin}
-                                    onChange={(e) => setNewLogin(e.target.value)}
+                                    value={newUsername}
+                                    onChange={(e) => setNewUsername(e.target.value)}
                                     required
                                     minLength={3}
                                 />
                             </div>
 
-                            {updateError && <div className="error-msg" style={{color: 'red', marginTop: '10px'}}>{updateError}</div>}
+                            {updateError && <div className="error-msg" style={{color: 'red', marginBottom: '12px'}}>{updateError}</div>}
 
-                            <div className="modal-actions">
+                            <div className="modal-actions"
+                                 style={{
+                                     display: 'flex',
+                                     justifyContent: 'space-between',
+                                     width: '100%',
+                                     marginTop: '20px'
+                                 }}>
                                 <button
                                     type="submit"
                                     className="button-agree"
                                     disabled={mutation.isPending}
-                                    style={{ marginRight: '100px' }}
+
                                 >
                                     {mutation.isPending ? 'Saving...' : 'Save Changes'}
                                 </button>

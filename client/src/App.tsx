@@ -19,6 +19,7 @@ import ResetPasswordRequest from './pages/ResetPasswordRequest';
 import ResetPassword from './pages/ResetPassword';
 import Home from './pages/Home';
 import About from './pages/About';
+import Editor from "./pages/Editor.tsx";
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="/home" element={<Home />} />
                 <Route path="*" element={<Navigate to="/home" replace />} />
                 <Route path="/about" element={<About />} />
+                <Route path="/editor/:id" element={<Editor />} />
               </>
             ) : (
               <>
