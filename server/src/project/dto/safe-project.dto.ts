@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from '@nestjs/swagger';
-import { JsonValue } from '@prisma/client/runtime/client';
+import { AssetType } from '@prisma/client';
 
 export class SafeProjectDto {
   @ApiProperty({ description: 'Id of the project', example: 1 })
@@ -61,11 +61,19 @@ export class SafeProjectDto {
     description: 'Id of the owner of project',
   })
   ownerId?: number | null;
+
+  @ApiProperty({
+    description: 'Assets of the project',
+    type: () => SafeAssetDto,
+    isArray: true,
+  })
+  assets?: SafeAssetDto[];
 }
 
 export class ProjectCardDto extends OmitType(SafeProjectDto, [
   'canvasData',
   'createdAt',
+  'assets',
 ]) {}
 
 export class ProjectHistoryDto {
@@ -94,3 +102,29 @@ export class ProjectHistoryDto {
 export class CardProjectHistoryDto extends OmitType(ProjectHistoryDto, [
   'canvas_data',
 ]) {}
+
+export class SafeAssetDto {
+  @ApiProperty({ description: 'Id of the asset', example: 67 })
+  id: number;
+
+  @ApiProperty({ description: 'Type of asset', enum: AssetType })
+  type: AssetType;
+
+  @ApiProperty({
+    description: 'Url of the image',
+    example: 'https://example.com/webster/assets/applepie',
+  })
+  url: string;
+
+  @ApiProperty({ description: 'Original name of photo', example: 'Apple pie' })
+  original_name: string;
+
+  @ApiProperty({ description: 'File size of the image', example: 1282758 })
+  file_size: number;
+
+  @ApiProperty({
+    description: 'Id of the project asset belongs to',
+    example: 2,
+  })
+  project_id?: number;
+}

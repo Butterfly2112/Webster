@@ -31,6 +31,7 @@ import { UploadService } from 'src/upload/upload.service';
 import {
   CardProjectHistoryDto,
   ProjectCardDto,
+  SafeAssetDto,
   SafeProjectDto,
 } from './dto/safe-project.dto';
 import {
@@ -68,6 +69,28 @@ export class ProjectController {
   @Get('templates')
   async getTemplates(@CurrentUser('sub') userId: number) {
     return await this.projectService.getTemplates(userId);
+  }
+
+  @ApiOperation({ summary: 'Create new project (optionally from template)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateProjectDtoD })
+  @ApiNotFoundResponse({ description: 'Template not found' })
+  @ApiForbiddenResponse({ description: 'No access to this template' })
+  @ApiOkResponse({ type: SafeProjectDto })
+  @Post('create')
+  @UseInterceptors(FileInterceptor('file'))
+  async createNewProject(
+    @Body() dto: CreateProjectDto,
+    @CurrentUser('sub') userId: number,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (file) {
+      const picture = await this.uploadService.uploadThumbnail(file);
+      dto.thumbnailUrl = picture.url;
+      dto.thumbnail_public_id = picture.public_id;
+    }
+
+    return await this.projectService.createProject(dto, userId);
   }
 
   @ApiOperation({ summary: 'Get project by id' })
@@ -114,26 +137,20 @@ export class ProjectController {
     return await this.projectService.updateProject(projectId, dto, userId);
   }
 
-  @ApiOperation({ summary: 'Create new project (optionally from template)' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: CreateProjectDtoD })
-  @ApiNotFoundResponse({ description: 'Template not found' })
-  @ApiForbiddenResponse({ description: 'No access to this template' })
-  @ApiOkResponse({ type: SafeProjectDto })
-  @Post('create')
-  @UseInterceptors(FileInterceptor('file'))
-  async createNewProject(
-    @Body() dto: CreateProjectDto,
+  @ApiOperation({ summary: 'Delete project and all its verions' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiNotFoundResponse({ description: 'Project not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiOkResponse({ description: 'Project was deleted successfully' })
+  @Delete(':id')
+  async deleteProject(
     @CurrentUser('sub') userId: number,
-    @UploadedFile() file?: Express.Multer.File,
+    @Param('id', ParseIntPipe) projectId: number,
   ) {
-    if (file) {
-      const picture = await this.uploadService.uploadThumbnail(file);
-      dto.thumbnailUrl = picture.url;
-      dto.thumbnail_public_id = picture.public_id;
-    }
-
-    return await this.projectService.createProject(dto, userId);
+    await this.projectService.deleteProject(projectId, userId);
+    return {
+      message: 'Project was deleted successfully',
+    };
   }
 
   @ApiOperation({ summary: 'Get project version history' })
@@ -170,19 +187,62 @@ export class ProjectController {
     );
   }
 
-  @ApiOperation({ summary: 'Delete project and all its verions' })
-  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOperation({ summary: 'Get project assets' })
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
-  @ApiOkResponse({ description: 'Project was deleted successfully' })
-  @Delete(':id')
-  async deleteProject(
+  @ApiOkResponse({ type: SafeAssetDto, isArray: true })
+  @Get(':id/assets')
+  async getProjectAssync(
     @CurrentUser('sub') userId: number,
     @Param('id', ParseIntPipe) projectId: number,
   ) {
-    await this.projectService.deleteProject(projectId, userId);
+    return await this.projectService.getProjectAssets(projectId, userId);
+  }
+
+  @ApiOperation({ description: 'Upload new asset to project assets' })
+  @ApiConsumes('multipart/form-data')
+  @ApiNotFoundResponse({ description: 'Project not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiOkResponse({ type: SafeAssetDto })
+  @UseInterceptors(FileInterceptor('file'))
+  @Post(':id/assets')
+  async uploadAsset(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) projectId: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return await this.projectService.uploadProjectAsset(
+      projectId,
+      userId,
+      file,
+    );
+  }
+
+  @ApiOperation({ description: 'Get asset by id' })
+  @ApiNotFoundResponse({ description: 'Asset not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiOkResponse({ type: SafeAssetDto })
+  @Get('assets/:id')
+  async getAssetId(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) assetId: number,
+  ) {
+    return await this.projectService.getProjectAsset(assetId, userId);
+  }
+
+  @ApiOperation({ summary: 'Delete project asset' })
+  @ApiParam({ name: 'id', type: Number, description: 'Asset id' })
+  @ApiNotFoundResponse({ description: 'Asset not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiOkResponse({ description: 'Asset deleted successfully' })
+  @Delete('assets/:id')
+  async deleteAsset(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) assetId: number,
+  ) {
+    await this.projectService.deleteProjectAsset(assetId, userId);
     return {
-      message: 'Project was deleted successfully',
+      message: 'Asset deleted successfully',
     };
   }
 }

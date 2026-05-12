@@ -13,14 +13,4 @@ import { JwtAccessGuard } from 'src/auth/guards/jwt-access.guard';
 @Controller('upload')
 export class UploadController {
   constructor(private uploadService: UploadService) {}
-
-  @Post('image')
-  @ApiOperation({ summary: 'Upload image for use in canvas' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('file'))
-  @UseGuards(JwtAccessGuard)
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
-    return this.uploadService.uploadImage(file);
-  }
 }

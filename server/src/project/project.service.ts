@@ -6,10 +6,11 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProjectDto } from './dto/save-project.dto';
 import { UserService } from 'src/user/user.service';
-import { Project } from '@prisma/client';
+import { Asset, Project } from '@prisma/client';
 import {
   CardProjectHistoryDto,
   ProjectCardDto,
+  SafeAssetDto,
   SafeProjectDto,
 } from './dto/safe-project.dto';
 import { UploadService } from 'src/upload/upload.service';
@@ -83,16 +84,17 @@ export class ProjectService {
   ): Promise<SafeProjectDto> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
+      include: { assets: true },
     });
 
     if (!project) {
       throw new NotFoundException('Project not found');
     }
     if (project.owner_id !== userId) {
-      throw new ForbiddenException('Only owner of the project can open it');
+      throw new ForbiddenException('Access denied');
     }
 
-    return this.toSafeProject(project);
+    return this.toSafeProject(project as Project & { assets: Asset[] });
   }
 
   async getUserProjects(userId: number): Promise<ProjectCardDto[]> {
@@ -113,7 +115,7 @@ export class ProjectService {
       orderBy: [{ owner_id: 'asc' }, { updated_at: 'desc' }],
     });
 
-    return templates.map(this.toProjectCard);
+    return templates.map(this.toSafeProject);
   }
 
   async updateProject(
@@ -204,7 +206,17 @@ export class ProjectService {
   }
 
   async deleteProject(projectId: number, userId: number): Promise<void> {
-    const project = await this.checkRights(projectId, userId);
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { assets: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    if (project.owner_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
 
     if (project.thumbnail_public_id) {
       this.safeDeleteFile(project.thumbnail_public_id);
@@ -218,10 +230,81 @@ export class ProjectService {
       public_id ?? this.safeDeleteFile(public_id);
     });
 
+    project.assets.map((asset) => {
+      this.safeDeleteFile(asset.public_id);
+    });
+
+    await this.prisma.asset.deleteMany({ where: { project_id: projectId } });
     await this.prisma.projectHistory.deleteMany({
       where: { project_id: projectId },
     });
     await this.prisma.project.delete({ where: { id: projectId } });
+  }
+
+  async uploadProjectAsset(
+    projectId: number,
+    userId: number,
+    file: Express.Multer.File,
+  ): Promise<SafeAssetDto> {
+    await this.checkRights(projectId, userId);
+
+    const uploaded = await this.uploadService.uploadImage(file);
+
+    const asset = await this.prisma.asset.create({
+      data: {
+        type: 'image',
+        url: uploaded.url,
+        public_id: uploaded.public_id,
+        original_name: file.originalname,
+        file_size: file.size,
+        owner_id: userId,
+        project_id: projectId,
+      },
+    });
+
+    return this.toSafeAsset(asset);
+  }
+
+  async getProjectAsset(
+    assetId: number,
+    userId: number,
+  ): Promise<SafeAssetDto> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+    if (asset.owner_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.toSafeAsset(asset);
+  }
+
+  async getProjectAssets(
+    projectId: number,
+    userId: number,
+  ): Promise<SafeAssetDto[]> {
+    const project = await this.getProjectById(projectId, userId);
+    return project.assets || [];
+  }
+
+  async deleteProjectAsset(assetId: number, userId: number): Promise<void> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+    if (asset.owner_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    await this.safeDeleteFile(asset.public_id);
+    await this.prisma.asset.delete({ where: { id: assetId } });
   }
 
   private async checkRights(
@@ -304,7 +387,9 @@ export class ProjectService {
     }
   }
 
-  private toSafeProject(project: Project): SafeProjectDto {
+  private toSafeProject(
+    project: Project & { assets?: Asset[] },
+  ): SafeProjectDto {
     return {
       id: project.id,
       title: project.title,
@@ -317,6 +402,7 @@ export class ProjectService {
       createdAt: project.created_at,
       updatedAt: project.updated_at,
       ownerId: project.owner_id,
+      assets: project.assets ? project.assets.map(this.toSafeAsset) : undefined,
     };
   }
 
@@ -331,6 +417,17 @@ export class ProjectService {
       isTemplate: project.is_template,
       updatedAt: project.updated_at,
       ownerId: project.owner_id,
+    };
+  }
+
+  private toSafeAsset(asset: Asset): SafeAssetDto {
+    return {
+      id: asset.id,
+      type: asset.type,
+      url: asset.url,
+      original_name: asset.original_name,
+      file_size: asset.file_size,
+      project_id: asset.id,
     };
   }
 }
