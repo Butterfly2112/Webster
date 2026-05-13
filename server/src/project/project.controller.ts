@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConsumes,
@@ -203,6 +204,7 @@ export class ProjectController {
   @ApiConsumes('multipart/form-data')
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
+  @ApiBadRequestResponse({ description: 'File is required' })
   @ApiOkResponse({ type: SafeAssetDto })
   @UseInterceptors(FileInterceptor('file'))
   @Post(':id/assets')

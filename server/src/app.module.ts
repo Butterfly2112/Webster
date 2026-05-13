@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { EmailModule } from './email/email.module';
 import { UploadModule } from './upload/upload.module';
 import { ProjectModule } from './project/project.module';
+import { FontModule } from './font/font.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProjectModule } from './project/project.module';
     EmailModule,
     UploadModule,
     ProjectModule,
+    FontModule,
   ],
   controllers: [],
   providers: [

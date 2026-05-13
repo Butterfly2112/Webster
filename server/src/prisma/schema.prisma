@@ -113,7 +113,6 @@ model Font {
   url        String
   public_id  String
   format     String
-  is_default Boolean  @default(false)
   created_at DateTime @default(now())
 
   owner    User? @relation(fields: [owner_id], references: [id], onDelete: Cascade)
