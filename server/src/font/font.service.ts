@@ -32,7 +32,10 @@ export class FontService {
     if (!font) {
       throw new NotFoundException('Font not found');
     }
-    if (font.owner_id !== userId) {
+    const isSystemFont = font.owner_id === null;
+    const isOwnFont = font.owner_id === userId;
+
+    if (!isSystemFont && !isOwnFont) {
       throw new ForbiddenException('Access denied');
     }
 

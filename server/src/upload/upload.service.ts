@@ -6,7 +6,6 @@ import {
 } from 'cloudinary';
 import { Readable } from 'stream';
 import 'multer';
-import { PrismaService } from 'src/prisma/prisma.service';
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
