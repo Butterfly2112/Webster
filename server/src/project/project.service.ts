@@ -115,7 +115,7 @@ export class ProjectService {
       orderBy: [{ owner_id: 'asc' }, { updated_at: 'desc' }],
     });
 
-    return templates.map(this.toSafeProject);
+    return templates.map(this.toProjectCard);
   }
 
   async updateProject(
@@ -199,7 +199,11 @@ export class ProjectService {
 
     const restored = await this.prisma.project.update({
       where: { id: projectId },
-      data: { canvas_data: historyEntry.canvas_data as object },
+      data: {
+        canvas_data: historyEntry.canvas_data as object,
+        thumbnail_url: historyEntry.thumbnail_url,
+        thumbnail_public_id: historyEntry.thumbnail_public_id,
+      },
     });
 
     return this.toSafeProject(restored);
@@ -226,8 +230,9 @@ export class ProjectService {
       select: { thumbnail_public_id: true },
     });
 
-    files.map((public_id) => {
-      public_id ?? this.safeDeleteFile(public_id);
+    files.map((item) => {
+      if (item.thumbnail_public_id)
+        this.safeDeleteFile(item.thumbnail_public_id);
     });
 
     project.assets.map((asset) => {
@@ -427,7 +432,7 @@ export class ProjectService {
       url: asset.url,
       original_name: asset.original_name,
       file_size: asset.file_size,
-      project_id: asset.id,
+      project_id: asset.project_id || undefined,
     };
   }
 }

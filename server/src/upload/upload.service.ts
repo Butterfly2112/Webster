@@ -14,6 +14,7 @@ const ALLOWED_IMAGE_TYPES = [
   'image/webp',
   'image/gif',
   'image/svg',
+  'image/svg+xml',
 ];
 
 const ALLOWED_FONT_TYPES = [
