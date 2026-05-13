@@ -423,7 +423,57 @@ export default function Editor() {
         setElements(elements.map(el => el.id === selectedId ? { ...el, [key]: value } : el));
     };
 
+    const selectedElementIndex = elements.findIndex(el => el.id === selectedId);
+
+    const getLayerLabel = (element?: { type?: string; text?: string; shapeType?: string; tool?: string }) => {
+        if (!element?.type) return 'Element';
+
+        if (element.type === 'text') {
+            const previewText = (element.text || 'Text').replace(/\s+/g, ' ').trim();
+            return previewText.length > 20 ? `${previewText.slice(0, 20)}...` : previewText;
+        }
+
+        if (element.type === 'shape') {
+            return element.shapeType ? `${element.shapeType.charAt(0).toUpperCase()}${element.shapeType.slice(1)} shape` : 'Shape';
+        }
+
+        if (element.type === 'image') return 'Image';
+
+        if (element.type === 'line') {
+            if (element.tool === 'eraser') return 'Eraser stroke';
+            if (element.tool === 'arrow') return 'Arrow';
+            if (element.tool === 'dashed') return 'Dashed line';
+            return 'Line';
+        }
+
+        return element.type.charAt(0).toUpperCase() + element.type.slice(1);
+    };
+
+    const visibleLayers = [...elements]
+        .filter(el => Boolean(el) && el.type)
+        .map((element, index) => ({ element, index }))
+        .reverse();
+
+    const moveSelectedElement = (toIndex: number) => {
+        if (selectedElementIndex < 0 || toIndex < 0 || toIndex >= elements.length || toIndex === selectedElementIndex) {
+            return;
+        }
+
+        setElements((prev) => {
+            const nextElements = [...prev];
+            const [movedElement] = nextElements.splice(selectedElementIndex, 1);
+            nextElements.splice(toIndex, 0, movedElement);
+            return nextElements;
+        });
+    };
+
+    const bringForward = () => moveSelectedElement(selectedElementIndex + 1);
+    const sendBackward = () => moveSelectedElement(selectedElementIndex - 1);
+    const bringToFront = () => moveSelectedElement(elements.length - 1);
+    const sendToBack = () => moveSelectedElement(0);
+
     const selectedElement = elements.find(el => el.id === selectedId);
+    const selectedElementType = selectedElement?.type || 'element';
 
     if (isLoading) return <div className="editor-loading">Loading Workspace...</div>;
     if (isError) return (
@@ -739,6 +789,29 @@ export default function Editor() {
                 <aside className="editor-sidebar-right">
                     <div className="properties-panel">
 
+                        <div className="layer-panel">
+                            <h3>Layers</h3>
+                            <div className="layer-list">
+                                {visibleLayers.map(({ element }, position) => {
+                                    const isActive = element.id === selectedId;
+
+                                    return (
+                                        <button
+                                            key={element.id}
+                                            type="button"
+                                            className={`layer-item ${isActive ? 'active' : ''}`}
+                                            onClick={() => setSelectedId(element.id)}
+                                            title={`Select ${getLayerLabel(element)}`}
+                                        >
+                                            <span className="layer-order">{visibleLayers.length - position}</span>
+                                            <span className="layer-name">{getLayerLabel(element)}</span>
+                                            <span className="layer-type">{element.type}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         {mode === 'draw' ? (
                             <>
                                 <h3>Draw Properties</h3>
@@ -769,9 +842,9 @@ export default function Editor() {
                             </>
                         ) : (
                             <>
-                                <h3>{selectedElement.type.toUpperCase()} PROPERTIES</h3>
+                                <h3>{selectedElementType.toUpperCase()} PROPERTIES</h3>
 
-                                {selectedElement.type === 'line' && (
+                                {selectedElementType === 'line' && (
                                     <>
                                         <div className="prop-group">
                                             <label>Line Color</label>
@@ -820,7 +893,7 @@ export default function Editor() {
                                     </>
                                 )}
 
-                                {selectedElement.type === 'text' && (
+                                {selectedElementType === 'text' && (
                                     <>
                                         <div className="prop-group"><label>Text Content</label><textarea value={selectedElement.text} onChange={(e) => updateSelectedElement('text', e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0', minHeight: '50px' }} /></div>
                                         <div className="prop-group">
@@ -888,7 +961,7 @@ export default function Editor() {
                                     </>
                                 )}
 
-                                {selectedElement.type === 'shape' && (
+                                {selectedElementType === 'shape' && (
                                     <>
                                         <div className="prop-group"><label>Shape Color</label><div style={{ display: 'flex', gap: '10px' }}><input type="color" value={selectedElement.fill} onChange={(e) => updateSelectedElement('fill', e.target.value)} /><input type="text" value={selectedElement.fill} onChange={(e) => updateSelectedElement('fill', e.target.value)} style={{ flex: 1, textTransform: 'uppercase' }} /></div></div>
                                         {selectedElement.shapeType === 'rect' && (
@@ -912,6 +985,24 @@ export default function Editor() {
                                         <div style={{ flex: 1 }}><label>Y</label><input type="number" value={Math.round(selectedElement.y)} onChange={(e) => updateSelectedElement('y', Number(e.target.value))} /></div>
                                     </div>
                                 )}
+
+                                <div className="prop-group">
+                                    <label>Layer</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                        <button className="button-secondary" onClick={sendToBack} disabled={selectedElementIndex <= 0} style={{ padding: '8px 10px', marginBottom: 0 }}>
+                                            Send to back
+                                        </button>
+                                        <button className="button-secondary" onClick={bringToFront} disabled={selectedElementIndex < 0 || selectedElementIndex >= elements.length - 1} style={{ padding: '8px 10px', marginBottom: 0 }}>
+                                            Bring to front
+                                        </button>
+                                        <button className="button-secondary" onClick={sendBackward} disabled={selectedElementIndex <= 0} style={{ padding: '8px 10px', marginBottom: 0 }}>
+                                            Move backward
+                                        </button>
+                                        <button className="button-secondary" onClick={bringForward} disabled={selectedElementIndex < 0 || selectedElementIndex >= elements.length - 1} style={{ padding: '8px 10px', marginBottom: 0 }}>
+                                            Move forward
+                                        </button>
+                                    </div>
+                                </div>
 
                                 {selectedElement.type === 'image' && (
                                     <div className="prop-group">
