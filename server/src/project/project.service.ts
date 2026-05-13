@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -251,6 +252,10 @@ export class ProjectService {
     userId: number,
     file: Express.Multer.File,
   ): Promise<SafeAssetDto> {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
     await this.checkRights(projectId, userId);
 
     const uploaded = await this.uploadService.uploadImage(file);

@@ -95,6 +95,12 @@ export class UploadService {
   async uploadFont(
     file: Express.Multer.File,
   ): Promise<{ url: string; public_id: string }> {
+    if (!ALLOWED_FONT_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only ttf, woff, woff2, and otf allowed',
+      );
+    }
+
     if (file.size > MAX_FONT_SIZE) {
       throw new BadRequestException('Font file too large. Max 5MB.');
     }
