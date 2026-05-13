@@ -221,11 +221,13 @@ const CanvasLine = ({ lineInfo, onSelect }: { lineInfo: any, onSelect: () => voi
 
 export default function WorkspaceCanvas({
                                             width, height, elements, setElements, selectedId, setSelectedId,
-                                            mode, drawTool, drawColor, drawSize
+                                            mode, drawTool, drawColor, drawSize, onStageReady
                                         }: {
     width: number, height: number, elements: any[], setElements: any,
     selectedId: string | null, setSelectedId: (id: string | null) => void,
-    mode?: string, drawTool?: string, drawColor?: string, drawSize?: number
+    mode?: string, drawTool?: string, drawColor?: string, drawSize?: number,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onStageReady?: (stage: any) => void
 }) {
     const stageRef = useRef<any>(null);
     const trRef = useRef<any>(null);
@@ -247,6 +249,12 @@ export default function WorkspaceCanvas({
             }
         }
     }, [selectedId, elements, editingTextId, mode]);
+
+    useEffect(() => {
+        if (onStageReady && stageRef.current) {
+            onStageReady(stageRef.current.getStage());
+        }
+    }, [onStageReady]);
 
 
     const handleMouseDown = (e: any) => {

@@ -11,6 +11,8 @@ export default function Editor() {
     const queryClient = useQueryClient();
     const user = useAuthStore(s => s.user);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stageRef = useRef<any>(null);
 
     const [title, setTitle] = useState('Loading...');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -20,6 +22,8 @@ export default function Editor() {
     const [canvasBgColor, setCanvasBgColor] = useState('#ffffff');
     const [showGrid, setShowGrid] = useState(false);
 
+    // Dynamic canvas element schemas vary by tool and are validated at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [elements, setElements] = useState<any[]>([]);
 
     const [showFiltersMenu, setShowFiltersMenu] = useState(false);
@@ -35,8 +39,10 @@ export default function Editor() {
 
     const [showShapesMenu, setShowShapesMenu] = useState(false);
     const [showDrawMenu, setShowDrawMenu] = useState(false);
+    const [showHistoryMenu, setShowHistoryMenu] = useState(false);
     const [showTemplateMenu, setShowTemplateMenu] = useState(false);
     const [templateMessage, setTemplateMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
+    const [historyMessage, setHistoryMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const loadedProjectIdRef = useRef<number | null>(null);
@@ -45,6 +51,35 @@ export default function Editor() {
     const [drawTool, setDrawTool] = useState<'pen' | 'marker' | 'eraser' | 'line' | 'arrow' | 'dashed'>('pen');
     const [drawColor, setDrawColor] = useState('#000000');
     const [drawSize, setDrawSize] = useState(5);
+
+    const applyProjectState = (projectData: {
+        id: number;
+        title?: string;
+        width?: number;
+        height?: number;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        canvasData?: any;
+    }) => {
+        const parsedCanvas = typeof projectData.canvasData === 'string'
+            ? JSON.parse(projectData.canvasData)
+            : projectData.canvasData;
+
+        setTitle(projectData.title || 'Untitled Design');
+        if (projectData.width) setCanvasWidth(projectData.width);
+        if (projectData.height) setCanvasHeight(projectData.height);
+
+        if (parsedCanvas?.attrs?.backgroundColor) {
+            setCanvasBgColor(parsedCanvas.attrs.backgroundColor);
+        }
+
+        if (parsedCanvas?.children) {
+            setElements(parsedCanvas.children);
+        }
+
+        setSelectedId(null);
+        setMode('select');
+        loadedProjectIdRef.current = projectData.id;
+    };
 
     const { data: project, isLoading, isError } = useQuery({
         queryKey: ['project', id],
@@ -56,24 +91,37 @@ export default function Editor() {
         enabled: !!id && id !== 'new',
     });
 
+    const {
+        data: historyVersions = [],
+        isLoading: isHistoryLoading,
+        isError: isHistoryError,
+    } = useQuery({
+        queryKey: ['project-history', id],
+        queryFn: async () => {
+            const response = await customFetch(`/api/project/${id}/version`);
+            if (!response.ok) throw new Error('Failed to load history');
+            return response.json() as Promise<Array<{
+                id: number;
+                version: number;
+                thumbnail_url: string | null;
+                created_at: string;
+            }>>;
+        },
+        enabled: !!id && id !== 'new' && showHistoryMenu,
+    });
+
     useEffect(() => {
         if (project && loadedProjectIdRef.current !== project.id) {
-
-            setTitle(project.title || 'Untitled Design');
-            if (project.width) setCanvasWidth(project.width);
-            if (project.height) setCanvasHeight(project.height);
-
-            if (project.canvasData?.attrs?.backgroundColor) {
-                setCanvasBgColor(project.canvasData.attrs.backgroundColor);
-            }
-
-            if (project.canvasData?.children) {
-                setElements(project.canvasData.children);
-            }
-
-            loadedProjectIdRef.current = project.id;
+            applyProjectState(project);
         }
     }, [project]);
+
+    useEffect(() => {
+        if (!historyMessage) return;
+
+        const timeout = setTimeout(() => setHistoryMessage(null), 3000);
+        return () => clearTimeout(timeout);
+    }, [historyMessage]);
 
     const uploadAssetMutation = useMutation({
         mutationFn: async (formData: FormData) => {
@@ -179,7 +227,8 @@ export default function Editor() {
     };
 
     const saveMutation = useMutation({
-        mutationFn: async (updateData: { title: string; width: number; height: number; bgColor: string; elements: any[] }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mutationFn: async (updateData: { title: string; width: number; height: number; bgColor: string; elements: any[]; thumbnailUrl?: string }) => {
             const currentCanvasData = typeof project.canvasData === 'string'
                 ? JSON.parse(project.canvasData)
                 : JSON.parse(JSON.stringify(project?.canvasData || { className: 'Stage', attrs: {}, children: [] }));
@@ -191,6 +240,24 @@ export default function Editor() {
 
             currentCanvasData.children = updateData.elements;
 
+            if (updateData.thumbnailUrl) {
+                const thumbnailResponse = await customFetch(`/api/project/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: updateData.title,
+                        width: updateData.width,
+                        height: updateData.height,
+                        thumbnailUrl: updateData.thumbnailUrl,
+                    }),
+                });
+
+                if (!thumbnailResponse.ok) {
+                    const thumbErrData = await thumbnailResponse.json().catch(() => ({}));
+                    console.error('Thumbnail save error:', thumbErrData);
+                }
+            }
+
             const response = await customFetch(`/api/project/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -198,7 +265,8 @@ export default function Editor() {
                     title: updateData.title,
                     width: updateData.width,
                     height: updateData.height,
-                    canvasData: currentCanvasData
+                    canvasData: currentCanvasData,
+                    thumbnailUrl: updateData.thumbnailUrl
                 }),
             });
 
@@ -211,6 +279,7 @@ export default function Editor() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['project', id] });
+            queryClient.invalidateQueries({ queryKey: ['project-history', id] });
         }
     });
 
@@ -259,12 +328,97 @@ export default function Editor() {
         }
     });
 
-    const handleSave = () => {
-        saveMutation.mutate({
-            title, width: canvasWidth, height: canvasHeight, bgColor: canvasBgColor, elements
+    const restoreVersionMutation = useMutation({
+        mutationFn: async (historyId: number) => {
+            const response = await customFetch(`/api/project/${id}/restore-version`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ historyId }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to restore version');
+            }
+
+            return response.json() as Promise<{
+                id: number;
+                title?: string;
+                width?: number;
+                height?: number;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                canvasData?: any;
+            }>;
+        },
+        onSuccess: (restoredProject) => {
+            applyProjectState(restoredProject);
+            setHistoryMessage({ text: 'Version restored', type: 'success' });
+            queryClient.invalidateQueries({ queryKey: ['project', id] });
+            queryClient.invalidateQueries({ queryKey: ['project-history', id] });
+        },
+        onError: () => {
+            setHistoryMessage({ text: 'Failed to restore version', type: 'error' });
+        },
+    });
+
+    const formatHistoryDate = (date: string) => {
+        return new Date(date).toLocaleString([], {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
         });
     };
 
+    const visibleHistoryVersions = historyVersions.filter((version) => Boolean(version.thumbnail_url));
+
+    const generateThumbnailDataUrl = () => {
+        if (!stageRef.current) return undefined;
+
+        try {
+            const exportWidth = 360;
+            const maxSide = Math.max(canvasWidth, canvasHeight);
+            const pixelRatio = Math.max(0.2, Math.min(1, exportWidth / maxSide));
+
+            const stageCanvas = stageRef.current.toCanvas({
+                pixelRatio,
+                x: 0,
+                y: 0,
+                width: canvasWidth,
+                height: canvasHeight,
+            });
+
+            const composedCanvas = document.createElement('canvas');
+            composedCanvas.width = stageCanvas.width;
+            composedCanvas.height = stageCanvas.height;
+
+            const context = composedCanvas.getContext('2d');
+            if (!context) return undefined;
+
+            context.fillStyle = canvasBgColor;
+            context.fillRect(0, 0, composedCanvas.width, composedCanvas.height);
+            context.drawImage(stageCanvas, 0, 0);
+
+            return composedCanvas.toDataURL('image/jpeg', 0.82);
+        } catch (error) {
+            console.warn('Failed to generate thumbnail', error);
+            return undefined;
+        }
+    };
+
+    const handleSave = () => {
+        const thumbnailUrl = generateThumbnailDataUrl();
+        saveMutation.mutate({
+            title,
+            width: canvasWidth,
+            height: canvasHeight,
+            bgColor: canvasBgColor,
+            elements,
+            thumbnailUrl,
+        });
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateSelectedElement = (key: string, value: any) => {
         setElements(elements.map(el => el.id === selectedId ? { ...el, [key]: value } : el));
     };
@@ -300,7 +454,11 @@ export default function Editor() {
                 <div className="topbar-center"></div>
                 <div className="topbar-right">
                     <span className="save-status">
-                        {saveMutation.isPending ? 'Saving...' : 'All changes saved'}
+                        {restoreVersionMutation.isPending
+                            ? 'Restoring version...'
+                            : saveMutation.isPending
+                                ? 'Saving...'
+                                : 'All changes saved'}
                     </span>
                     <button className="button-disagree" onClick={handleSave}>Save</button>
                     <button className="button-agree">Export</button>
@@ -442,7 +600,67 @@ export default function Editor() {
                     <button className="tool-btn" title="Text" onClick={handleAddText}><img src="/text-icon.png" alt="Text" /><span className="tool-text">Text</span></button>
                     <button className="tool-btn" title="Image" onClick={handleImageClick}><img src="/image-icon.png" alt="Image" /><span className="tool-text">Image</span></button>
                     <div className="tool-divider"></div>
-                    <button className="tool-btn" title="History"><img src="/history-icon.png" alt="History" /><span className="tool-text">History</span></button>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center' }}>
+                        <button
+                            className={`tool-btn ${showHistoryMenu ? 'active' : ''}`}
+                            title="History"
+                            onClick={() => {
+                                setIsSidebarOpen(true);
+                                setShowHistoryMenu(!showHistoryMenu);
+                            }}
+                        >
+                            <img src="/history-icon.png" alt="History" />
+                            <span className="tool-text">History</span>
+                        </button>
+
+                        {showHistoryMenu && isSidebarOpen && (
+                            <div className="history-dropdown-container">
+                                <span className="history-title">Saved versions</span>
+
+                                {isHistoryLoading && <span className="history-empty">Loading versions...</span>}
+                                {isHistoryError && <span className="history-error">Failed to load history</span>}
+
+                                {!isHistoryLoading && !isHistoryError && visibleHistoryVersions.length === 0 && (
+                                    <span className="history-empty">No saved versions yet</span>
+                                )}
+
+                                {!isHistoryLoading && !isHistoryError && visibleHistoryVersions.map((version) => (
+                                    <div key={version.id} className="history-item">
+                                        <div className="history-item-top">
+                                            {version.thumbnail_url ? (
+                                                <div
+                                                    className="history-thumb"
+                                                    style={{ backgroundImage: `url(${version.thumbnail_url})` }}
+                                                />
+                                            ) : (
+                                                <div className="history-thumb history-thumb-empty">No preview</div>
+                                            )}
+
+                                            <div className="history-meta">
+                                                <strong>Version {version.version}</strong>
+                                                <span>{formatHistoryDate(version.created_at)}</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="button-secondary history-restore-btn"
+                                            onClick={() => restoreVersionMutation.mutate(version.id)}
+                                            disabled={restoreVersionMutation.isPending}
+                                        >
+                                            Restore
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {historyMessage && (
+                                    <span className={historyMessage.type === 'success' ? 'history-success' : 'history-error'}>
+                                        {historyMessage.text}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center', marginTop: '10px' }}>
                         <button
@@ -467,7 +685,7 @@ export default function Editor() {
                                 </span>
                                 <button
                                     onClick={() => saveAsTemplateMutation.mutate()}
-                                    disabled={saveAsTemplateMutation.isPending}
+                                    disabled={saveAsTemplateMutation.isPending || restoreVersionMutation.isPending}
                                    className="button-secondary"
                                     style={{ width: '100%', padding: '8px 12px', fontSize: '12px', marginTop: '8px' }}
                                 >
@@ -511,6 +729,9 @@ export default function Editor() {
                             drawTool={drawTool}
                             drawColor={drawColor}
                             drawSize={drawSize}
+                            onStageReady={(stage) => {
+                                stageRef.current = stage;
+                            }}
                         />
                     </div>
                 </main>
