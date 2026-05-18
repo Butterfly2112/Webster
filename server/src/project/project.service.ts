@@ -124,20 +124,7 @@ export class ProjectService {
     dto: UpdateProjectDto,
     userId: number,
   ): Promise<SafeProjectDto> {
-    const currentProject = await this.checkRights(
-      projectId,
-      userId,
-      dto.thumbnail_public_id,
-    );
-
-    if (dto.canvasData) {
-      await this.saveHistorySnapshot(
-        projectId,
-        currentProject.canvas_data as object,
-        currentProject.thumbnail_url,
-        currentProject.thumbnail_public_id,
-      );
-    }
+    await this.checkRights(projectId, userId, dto.thumbnail_public_id);
 
     const updated = await this.prisma.project.update({
       where: { id: projectId },
@@ -156,6 +143,15 @@ export class ProjectService {
         ...(dto.isTemplate !== undefined && { is_template: dto.isTemplate }),
       },
     });
+
+    if (dto.canvasData) {
+      await this.saveHistorySnapshot(
+        projectId,
+        updated.canvas_data as object,
+        updated.thumbnail_url,
+        updated.thumbnail_public_id,
+      );
+    }
 
     return this.toSafeProject(updated);
   }

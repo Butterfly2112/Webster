@@ -46,6 +46,7 @@ export default function Editor() {
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const loadedProjectIdRef = useRef<number | null>(null);
+    const saveLockRef = useRef(false);
 
     const [mode, setMode] = useState<'select' | 'draw'>('select');
     const [drawTool, setDrawTool] = useState<'pen' | 'marker' | 'eraser' | 'line' | 'arrow' | 'dashed'>('pen');
@@ -228,7 +229,7 @@ export default function Editor() {
 
     const saveMutation = useMutation({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mutationFn: async (updateData: { title: string; width: number; height: number; bgColor: string; elements: any[]; thumbnailUrl?: string }) => {
+        mutationFn: async (updateData: { title: string; width: number; height: number; bgColor: string; elements: any[]; thumbnailDataUrl?: string }) => {
             const currentCanvasData = typeof project.canvasData === 'string'
                 ? JSON.parse(project.canvasData)
                 : JSON.parse(JSON.stringify(project?.canvasData || { className: 'Stage', attrs: {}, children: [] }));
@@ -240,16 +241,18 @@ export default function Editor() {
 
             currentCanvasData.children = updateData.elements;
 
-            if (updateData.thumbnailUrl) {
+            if (updateData.thumbnailDataUrl) {
+                const thumbnailBlob = await (await fetch(updateData.thumbnailDataUrl)).blob();
+                const thumbnailFile = new File([thumbnailBlob], 'thumbnail.jpg', {
+                    type: thumbnailBlob.type || 'image/jpeg',
+                });
+
+                const thumbnailFormData = new FormData();
+                thumbnailFormData.append('file', thumbnailFile);
+
                 const thumbnailResponse = await customFetch(`/api/project/${id}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        title: updateData.title,
-                        width: updateData.width,
-                        height: updateData.height,
-                        thumbnailUrl: updateData.thumbnailUrl,
-                    }),
+                    body: thumbnailFormData,
                 });
 
                 if (!thumbnailResponse.ok) {
@@ -266,7 +269,6 @@ export default function Editor() {
                     width: updateData.width,
                     height: updateData.height,
                     canvasData: currentCanvasData,
-                    thumbnailUrl: updateData.thumbnailUrl
                 }),
             });
 
@@ -275,11 +277,15 @@ export default function Editor() {
                 console.error("Backend Error:", errData);
                 throw new Error('Failed to save project');
             }
+
             return response.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['project', id] });
             queryClient.invalidateQueries({ queryKey: ['project-history', id] });
+        },
+        onSettled: () => {
+            saveLockRef.current = false;
         }
     });
 
@@ -407,14 +413,19 @@ export default function Editor() {
     };
 
     const handleSave = () => {
-        const thumbnailUrl = generateThumbnailDataUrl();
+        if (saveLockRef.current || saveMutation.isPending) {
+            return;
+        }
+
+        saveLockRef.current = true;
+        const thumbnailDataUrl = generateThumbnailDataUrl();
         saveMutation.mutate({
             title,
             width: canvasWidth,
             height: canvasHeight,
             bgColor: canvasBgColor,
             elements,
-            thumbnailUrl,
+            thumbnailDataUrl,
         });
     };
 
@@ -510,7 +521,13 @@ export default function Editor() {
                                 ? 'Saving...'
                                 : 'All changes saved'}
                     </span>
-                    <button className="button-disagree" onClick={handleSave}>Save</button>
+                    <button
+                        className="button-disagree"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleSave}
+                    >
+                        Save
+                    </button>
                     <button className="button-agree">Export</button>
                     <img
                         src={user?.avatar_url || '/default-avatar.png'}
