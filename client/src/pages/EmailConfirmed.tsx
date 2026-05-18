@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { confirmEmail } from '../api/auth';
+import { useAuthStore } from '../store/auth';
 
 const CONFIRMED_TOKENS_KEY = 'confirmedEmailTokens';
 
@@ -25,6 +26,8 @@ export default function EmailConfirmed() {
   const [message, setMessage] = useState('');
   const confirmedTokenRef = useRef<string | null>(null);
 
+  const user = useAuthStore(s => s.user);
+
   const setResult = (nextStatus: 'success' | 'error', nextMessage: string) => {
     window.setTimeout(() => {
       setStatus(nextStatus);
@@ -46,27 +49,27 @@ export default function EmailConfirmed() {
     confirmedTokenRef.current = token;
 
     if (getConfirmedTokens().includes(token)) {
-      setResult('success', 'Your account has already been successfully confirmed.');
+      setResult('success', 'Your email has already been successfully verified.');
       return;
     }
 
     confirmEmail(token)
         .then((res) => {
           setStatus('success');
-          setMessage(res.message || 'Your account has been successfully confirmed.');
+          setMessage(res.message || 'Your email address has been successfully verified.');
           setConfirmedToken(token);
         })
         .catch((err) => {
           if (getConfirmedTokens().includes(token)) {
             setStatus('success');
-            setMessage('Your account has already been successfully confirmed.');
+            setMessage('Your email has already been successfully verified.');
             return;
           }
 
           setStatus('error');
           setMessage(
               err instanceof Error && err.message.toLowerCase().includes('invalid token')
-                  ? 'Your account has already been successfully confirmed.'
+                  ? 'Your email has already been successfully verified.'
                   : err instanceof Error
                       ? err.message
                       : 'Invalid or expired token.',
@@ -74,8 +77,11 @@ export default function EmailConfirmed() {
         });
   }, [searchParams]);
 
+  const redirectLink = user ? '/home' : '/login';
+  const redirectText = user ? 'Go to Projects' : 'Go to Login';
+
   return (
-      <div className="login-page" style={{ justifyContent: 'center', background: 'var(--main-bg)', padding: '20px' }}>
+      <div className="login-page" style={{ justifyContent: 'center', background: 'var(--main-bg)', padding: '20px', minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
         <div className="modal-content" style={{ textAlign: 'center', width: '100%', maxWidth: '450px', margin: 'auto' }}>
 
           {status === 'pending' && (
@@ -85,7 +91,7 @@ export default function EmailConfirmed() {
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                   </svg>
                 </div>
-                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px' }}>Confirming...</h2>
+                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px' }}>Verifying...</h2>
                 <p style={{ color: 'var(--text-light)', margin: 0 }}>Please wait while we verify your email.</p>
               </div>
           )}
@@ -97,10 +103,10 @@ export default function EmailConfirmed() {
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px', fontSize: '24px', fontWeight: 700 }}>Email Confirmed!</h2>
+                <h2 style={{ color: 'var(--primary-color)', marginBottom: '10px', fontSize: '24px', fontWeight: 700 }}>Email Verified!</h2>
                 <p style={{ color: 'var(--text-light)', marginBottom: '30px', lineHeight: '1.6' }}>{message}</p>
-                <Link to="/login" className="button-agree" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
-                  Go to Login
+                <Link to={redirectLink} className="button-agree" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
+                  {redirectText}
                 </Link>
               </div>
           )}
@@ -113,12 +119,12 @@ export default function EmailConfirmed() {
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </div>
-                <h2 style={{ color: 'var(--error-color)', marginBottom: '15px', fontSize: '24px', fontWeight: 700 }}>Confirmation Failed</h2>
+                <h2 style={{ color: 'var(--error-color)', marginBottom: '15px', fontSize: '24px', fontWeight: 700 }}>Verification Failed</h2>
                 <div className="error-msg" style={{ marginBottom: '30px' }}>
                   {message}
                 </div>
-                <Link to="/login" className="button-secondary" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
-                  Back to Login
+                <Link to={redirectLink} className="button-secondary" style={{ display: 'block', width: '100%', boxSizing: 'border-box' }}>
+                  Continue
                 </Link>
               </div>
           )}

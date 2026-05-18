@@ -22,7 +22,6 @@ export default function Editor() {
     const [canvasBgColor, setCanvasBgColor] = useState('#ffffff');
     const [showGrid, setShowGrid] = useState(false);
 
-    // Dynamic canvas element schemas vary by tool and are validated at runtime.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [elements, setElements] = useState<any[]>([]);
 
@@ -37,12 +36,20 @@ export default function Editor() {
         { name: 'Bright', filter: 'Brighten', previewClass: 'filter-bright' },
     ];
 
+    const SYSTEM_IMAGES = [
+        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=200&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop'
+    ];
+
     const [showShapesMenu, setShowShapesMenu] = useState(false);
     const [showDrawMenu, setShowDrawMenu] = useState(false);
     const [showHistoryMenu, setShowHistoryMenu] = useState(false);
     const [showTemplateMenu, setShowTemplateMenu] = useState(false);
     const [templateMessage, setTemplateMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
     const [historyMessage, setHistoryMessage] = useState<{text: string, type: 'success' | 'error'} | null>(null);
+    const [showImageMenu, setShowImageMenu] = useState(false);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const loadedProjectIdRef = useRef<number | null>(null);
@@ -52,6 +59,64 @@ export default function Editor() {
     const [drawColor, setDrawColor] = useState('#000000');
     const [drawSize, setDrawSize] = useState(5);
 
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [showExitModal, setShowExitModal] = useState(false);
+    const isProgrammaticUpdate = useRef(true);
+
+    useEffect(() => {
+        if (isProgrammaticUpdate.current) return;
+        setHasUnsavedChanges(true);
+    }, [elements, title, canvasWidth, canvasHeight, canvasBgColor]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && hasUnsavedChanges) {
+
+                const currentCanvasData = {
+                    className: 'Stage',
+                    attrs: { backgroundColor: canvasBgColor },
+                    children: elements.filter(el => el.type !== 'placeholder')
+                };
+
+                fetch(`/api/project/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: title,
+                        width: canvasWidth,
+                        height: canvasHeight,
+                        canvasData: currentCanvasData
+                    }),
+                    keepalive: true
+                }).catch(err => console.error('Emergency save failed:', err));
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [hasUnsavedChanges, title, canvasWidth, canvasHeight, canvasBgColor, elements, id]);
+
+    // Обробник натискання кнопки "Back"
+    const handleExitClick = () => {
+        if (hasUnsavedChanges) {
+            setShowExitModal(true);
+        } else {
+            navigate('/home');
+        }
+    };
+
     const applyProjectState = (projectData: {
         id: number;
         title?: string;
@@ -60,6 +125,8 @@ export default function Editor() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         canvasData?: any;
     }) => {
+        isProgrammaticUpdate.current = true;
+
         const parsedCanvas = typeof projectData.canvasData === 'string'
             ? JSON.parse(projectData.canvasData)
             : projectData.canvasData;
@@ -79,6 +146,11 @@ export default function Editor() {
         setSelectedId(null);
         setMode('select');
         loadedProjectIdRef.current = projectData.id;
+
+        setTimeout(() => {
+            isProgrammaticUpdate.current = false;
+            setHasUnsavedChanges(false);
+        }, 100);
     };
 
     const { data: project, isLoading, isError } = useQuery({
@@ -110,6 +182,16 @@ export default function Editor() {
         enabled: !!id && id !== 'new' && showHistoryMenu,
     });
 
+    const { data: projectAssets = [], isLoading: isAssetsLoading } = useQuery({
+        queryKey: ['project-assets', id],
+        queryFn: async () => {
+            const response = await customFetch(`/api/project/${id}/assets`);
+            if (!response.ok) throw new Error('Failed to load assets');
+            return response.json();
+        },
+        enabled: !!id && id !== 'new' && showImageMenu,
+    });
+
     useEffect(() => {
         if (project && loadedProjectIdRef.current !== project.id) {
             applyProjectState(project);
@@ -124,59 +206,131 @@ export default function Editor() {
     }, [historyMessage]);
 
     const uploadAssetMutation = useMutation({
-        mutationFn: async (formData: FormData) => {
+        mutationFn: async ({ formData, tempId, w, h }: { formData: FormData, tempId: string, w: number, h: number }) => {
             const response = await customFetch(`/api/project/${id}/assets`, {
                 method: 'POST',
                 body: formData,
             });
 
             if (!response.ok) throw new Error('Failed to upload image');
-            return response.json() as Promise<{ url: string; public_id: string; width: number; height: number }>;
+            const data = await response.json();
+            return { ...data, tempId, shrinkW: w, shrinkH: h };
         },
         onSuccess: (result) => {
-            let insertWidth = result.width;
-            let insertHeight = result.height;
+            setElements((prev) => prev.map(el => {
+                if (el.id === result.tempId) {
+                    return {
+                        id: result.tempId,
+                        type: 'image',
+                        src: result.url,
+                        cloudinaryId: result.public_id,
+                        x: el.x,
+                        y: el.y,
+                        width: result.shrinkW,
+                        height: result.shrinkH,
+                        rotation: 0
+                    };
+                }
+                return el;
+            }));
 
-            if (insertWidth > 400) {
-                const ratio = 400 / insertWidth;
-                insertWidth = 400;
-                insertHeight = insertHeight * ratio;
-            }
-
-            const newImage = {
-                id: Date.now().toString(),
-                type: 'image',
-                src: result.url,
-                cloudinaryId: result.public_id,
-                x: 50,
-                y: 50,
-                width: insertWidth,
-                height: insertHeight,
-            };
-
-            setElements((prev) => [...prev, newImage]);
             setMode('select');
-            setSelectedId(newImage.id);
-
+            setSelectedId(result.tempId);
             if (fileInputRef.current) fileInputRef.current.value = '';
+
+            queryClient.invalidateQueries({ queryKey: ['project-assets', id] });
         },
-        onError: (err) => {
+        onError: (err, variables) => {
             console.error(err);
-            alert("Failed to upload image.");
+            setElements((prev) => prev.map(el => el.id === variables.tempId ? { ...el, status: 'error', message: 'Upload failed' } : el));
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     });
-
-    const handleImageClick = () => {
-        fileInputRef.current?.click();
-    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const formData = new FormData();
-        formData.append('file', file);
-        uploadAssetMutation.mutate(formData);
+        const tempId = Date.now().toString();
+        const maxSize = 10 * 1024 * 1024;
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+
+        if (file.size > maxSize || !validTypes.includes(file.type)) {
+            setElements((prev) => [...prev, { id: tempId, type: 'placeholder', status: 'error', message: file.size > maxSize ? 'Max size 10MB' : 'Invalid format', x: 100, y: 100, width: 200, height: 200 }]);
+            setMode('select');
+            setSelectedId(tempId);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        const imgUrl = URL.createObjectURL(file);
+        const img = new window.Image();
+
+        img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            const maxDim = 400;
+
+            if (w > maxDim || h > maxDim) {
+                const ratio = Math.min(maxDim / w, maxDim / h);
+                w = w * ratio;
+                h = h * ratio;
+            }
+
+            setElements((prev) => [...prev, {
+                id: tempId, type: 'placeholder', status: 'loading',
+                x: 100, y: 100, width: w, height: h
+            }]);
+
+            setMode('select');
+            setSelectedId(tempId);
+            setShowImageMenu(false);
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadAssetMutation.mutate({ formData, tempId, w, h });
+
+            URL.revokeObjectURL(imgUrl);
+        };
+        img.src = imgUrl;
+    };
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleAddExistingImage = (url: string) => {
+        const tempId = Date.now().toString();
+        const img = new window.Image();
+
+        img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            const maxDim = 400;
+
+            if (w > maxDim || h > maxDim) {
+                const ratio = Math.min(maxDim / w, maxDim / h);
+                w = w * ratio;
+                h = h * ratio;
+            }
+
+            setElements((prev) => [...prev, {
+                id: tempId,
+                type: 'image',
+                src: url,
+                x: 100,
+                y: 100,
+                width: w,
+                height: h,
+                rotation: 0
+            }]);
+
+            setMode('select');
+            setSelectedId(tempId);
+            setShowImageMenu(false);
+        };
+        img.src = url;
     };
 
     const handleAddText = () => {
@@ -278,6 +432,7 @@ export default function Editor() {
             return response.json();
         },
         onSuccess: () => {
+            setHasUnsavedChanges(false);
             queryClient.invalidateQueries({ queryKey: ['project', id] });
             queryClient.invalidateQueries({ queryKey: ['project-history', id] });
         }
@@ -488,7 +643,7 @@ export default function Editor() {
 
             <header className="editor-topbar">
                 <div className="topbar-left">
-                    <button className="btn-back" onClick={() => navigate('/home')} title="Back to Home">
+                    <button className="btn-back" onClick={handleExitClick} title="Back to Home">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M19 12H5M12 19l-7-7 7-7"/>
                         </svg>
@@ -522,7 +677,10 @@ export default function Editor() {
             </header>
 
             <div className="editor-body">
-                <aside className={`editor-sidebar-left ${isSidebarOpen ? 'open' : ''}`}>
+                <aside
+                    className={`editor-sidebar-left ${isSidebarOpen ? 'open' : ''}`}
+                    style={{ overflowY: 'auto', overflowX: 'hidden' }}
+                >
                     <button className="tool-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)} title="Toggle Tools">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -648,7 +806,80 @@ export default function Editor() {
                     </div>
 
                     <button className="tool-btn" title="Text" onClick={handleAddText}><img src="/text-icon.png" alt="Text" /><span className="tool-text">Text</span></button>
-                    <button className="tool-btn" title="Image" onClick={handleImageClick}><img src="/image-icon.png" alt="Image" /><span className="tool-text">Image</span></button>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center' }}>
+                        <button
+                            className={`tool-btn ${showImageMenu ? 'active' : ''}`}
+                            title="Image"
+                            onClick={() => {
+                                setIsSidebarOpen(true);
+                                setShowImageMenu(!showImageMenu);
+                            }}
+                        >
+                            <img src="/image-icon.png" alt="Image" />
+                            <span className="tool-text">Image</span>
+                        </button>
+
+                        {showImageMenu && isSidebarOpen && (
+                            <div className="history-dropdown-container" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                                <button
+                                    className="button-agree"
+                                    onClick={handleImageClick}
+                                    style={{ width: '100%', padding: '10px', fontSize: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    Upload new
+                                </button>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>Project uploads</span>
+
+                                    {isAssetsLoading ? (
+                                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Loading...</span>
+                                    ) : projectAssets.length > 0 ? (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                            {projectAssets.map((asset: any) => (
+                                                <div
+                                                    key={asset.id}
+                                                    onClick={() => handleAddExistingImage(asset.url)}
+                                                    style={{
+                                                        width: '100%', height: '50px',
+                                                        backgroundImage: `url(${asset.url})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                                                        borderRadius: '4px', cursor: 'pointer', border: '1px solid #e2e8f0'
+                                                    }}
+                                                    title="Add to canvas"
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>No images yet</span>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>System library</span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                                        {SYSTEM_IMAGES.map((src, index) => (
+                                            <div
+                                                key={`sys-${index}`}
+                                                onClick={() => handleAddExistingImage(src)}
+                                                style={{
+                                                    width: '100%', height: '50px',
+                                                    backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                                                    borderRadius: '4px', cursor: 'pointer', border: '1px solid #e2e8f0'
+                                                }}
+                                                title="Add to canvas"
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                            </div>
+                        )}
+                    </div>
                     <div className="tool-divider"></div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center' }}>
@@ -726,10 +957,7 @@ export default function Editor() {
                         </button>
 
                         {showTemplateMenu && isSidebarOpen && (
-                            <div style={{
-                                display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 10px', width: '100%',
-                                alignItems: 'center'
-                            }}>
+                            <div className="history-dropdown-container">
                                 <span style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', lineHeight: '1.2' }}>
                                     Save the current project with all elements as a template
                                 </span>
@@ -757,14 +985,21 @@ export default function Editor() {
                     </div>
                 </aside>
 
-                <main className="editor-canvas-container">
+                <main
+                    className="editor-canvas-container"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setSelectedId(null);
+                        }
+                    }}
+                >
                     <div
                         className="canvas-wrapper"
                         style={{
                             width: `${canvasWidth}px`, height: `${canvasHeight}px`, backgroundColor: canvasBgColor,
                             backgroundImage: showGrid ? 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)' : 'none',
                             backgroundSize: '20px 20px', transition: 'width 0.3s, height 0.3s, background-color 0.3s',
-                            cursor: mode === 'draw' ? 'crosshair' : 'default' // Змінюємо курсор при малюванні
+                            cursor: mode === 'draw' ? 'crosshair' : 'default'
                         }}
                     >
                         <WorkspaceCanvas
@@ -782,6 +1017,7 @@ export default function Editor() {
                             onStageReady={(stage) => {
                                 stageRef.current = stage;
                             }}
+                            showGrid={showGrid}
                         />
                     </div>
                 </main>
@@ -789,31 +1025,8 @@ export default function Editor() {
                 <aside className="editor-sidebar-right">
                     <div className="properties-panel">
 
-                        <div className="layer-panel">
-                            <h3>Layers</h3>
-                            <div className="layer-list">
-                                {visibleLayers.map(({ element }, position) => {
-                                    const isActive = element.id === selectedId;
-
-                                    return (
-                                        <button
-                                            key={element.id}
-                                            type="button"
-                                            className={`layer-item ${isActive ? 'active' : ''}`}
-                                            onClick={() => setSelectedId(element.id)}
-                                            title={`Select ${getLayerLabel(element)}`}
-                                        >
-                                            <span className="layer-order">{visibleLayers.length - position}</span>
-                                            <span className="layer-name">{getLayerLabel(element)}</span>
-                                            <span className="layer-type">{element.type}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
                         {mode === 'draw' ? (
-                            <>
+                            <div  style={{ borderBottom: '1px solid #e2e8f0' }}>
                                 <h3>Draw Properties</h3>
                                 {drawTool !== 'eraser' && (
                                     <div className="prop-group">
@@ -831,22 +1044,22 @@ export default function Editor() {
                                     </div>
                                     <input type="range" value={drawSize} onChange={(e) => setDrawSize(Number(e.target.value))} min="1" max="100" style={{ appearance: 'none', width: '100%', background: 'transparent', cursor: 'pointer', backgroundColor: '#e2e8f0', height: '6px', borderRadius: '10px' }} />
                                 </div>
-                            </>
+                            </div>
                         ) : !selectedElement ? (
-                            <>
+                            < div className="prop" style={{ borderBottom: '1px solid #e2e8f0' }}>
                                 <h3>Canvas Properties</h3>
                                 <div className="prop-group"><label>Canvas Width</label><input type="number" value={canvasWidth} onChange={(e) => setCanvasWidth(Number(e.target.value) || 1)} min="1" /></div>
                                 <div className="prop-group"><label>Canvas Height</label><input type="number" value={canvasHeight} onChange={(e) => setCanvasHeight(Number(e.target.value) || 1)} min="1" /></div>
                                 <div className="prop-group"><label>Background</label><div style={{ display: 'flex', gap: '10px' }}><input type="color" value={canvasBgColor} onChange={(e) => setCanvasBgColor(e.target.value)} /><input type="text" value={canvasBgColor} onChange={(e) => setCanvasBgColor(e.target.value)} style={{ flex: 1, textTransform: 'uppercase' }} /></div></div>
                                 <div className="prop-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '20px' }}><input type="checkbox" id="gridToggle" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} style={{ width: 'auto', cursor: 'pointer', transform: 'scale(1.2)' }} /><label htmlFor="gridToggle" style={{ margin: 0, cursor: 'pointer' }}>Show Grid</label></div>
-                            </>
+                            </div>
                         ) : (
-                            <>
+                            <div  style={{ borderBottom: '1px solid #e2e8f0' }}>
                                 <h3>{selectedElementType.toUpperCase()} PROPERTIES</h3>
 
                                 {selectedElementType === 'line' && (
                                     <>
-                                        <div className="prop-group">
+                                        <div className="prop-group" >
                                             <label>Line Color</label>
                                             <div style={{ display: 'flex', gap: '10px' }}>
                                                 <input type="color" value={selectedElement.stroke} onChange={(e) => updateSelectedElement('stroke', e.target.value)} />
@@ -1083,14 +1296,85 @@ export default function Editor() {
                                 )}
 
                                 <button className="button-secondary" style={{ width: '100%', marginTop: '20px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fdcece' }} onClick={() => { setElements(elements.filter(el => el.id !== selectedId)); setSelectedId(null); }}>Delete Element</button>
-                            </>
+                            </div>
                         )}
+                        <div className="layer-panel">
+                            <h3>Layers</h3>
+                            <div className="layer-list">
+                                {visibleLayers.map(({ element }, position) => {
+                                    const isActive = element.id === selectedId;
+
+                                    return (
+                                        <button
+                                            key={element.id}
+                                            type="button"
+                                            className={`layer-item ${isActive ? 'active' : ''}`}
+                                            onClick={() => setSelectedId(element.id)}
+                                            title={`Select ${getLayerLabel(element)}`}
+                                        >
+                                            <span className="layer-order">{visibleLayers.length - position}</span>
+                                            <span className="layer-name">{getLayerLabel(element)}</span>
+                                            <span className="layer-type">{element.type}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </aside>
 
             </div>
 
             <input type="file" accept="image/*" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+
+            {showExitModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999,
+                    display: 'flex', justifyContent: 'center', alignItems: 'center'
+                }}>
+                    <div style={{
+                        background: 'white', padding: '24px', borderRadius: '12px',
+                        width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                        display: 'flex', flexDirection: 'column', gap: '16px'
+                    }}>
+                        <h3 style={{ margin: 0, color: 'var(--primary-color)' }}>Unsaved Changes</h3>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.5' }}>
+                            You have unsaved changes on your canvas. Do you want to save them before leaving?
+                        </p>
+                        <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
+                            <button
+                                className="button-secondary"
+                                onClick={() => setShowExitModal(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="button-secondary"
+                                style={{ background: '#fee2e2', color: '#ef4444', border: '1px solid #fdcece' }}
+                                onClick={() => navigate('/home')}
+                            >
+                                Leave
+                            </button>
+                            <button
+                                className="button-secondary"
+                                onClick={async () => {
+                                    try {
+                                        await saveMutation.mutateAsync({
+                                            title, width: canvasWidth, height: canvasHeight, bgColor: canvasBgColor, elements, thumbnailUrl: generateThumbnailDataUrl()
+                                        });
+                                        navigate('/home');
+                                    } catch (e) {
+                                        console.error(e);
+                                    }
+                                }}
+                            >
+                                {saveMutation.isPending ? 'Saving...' : 'Save & Leave'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

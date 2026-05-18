@@ -719,6 +719,7 @@ a {
     transition: all 0.2s;
     white-space: nowrap;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .editor-sidebar-left.open .tool-btn { width: 100%; }
@@ -905,9 +906,9 @@ a {
 .properties-panel h3 { margin: 0 0 20px 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 
 .layer-panel {
+    margin-top: 18px;
     margin-bottom: 18px;
     padding-bottom: 14px;
-    border-bottom: 1px solid #e2e8f0;
 }
 
 .layer-list {
@@ -1083,4 +1084,50 @@ a {
 
 .filter-preview-box:hover {
     opacity: 0.8;
+}
+
+.editor-sidebar-left::-webkit-scrollbar {
+    width: 6px;
+}
+
+.editor-sidebar-left::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor-sidebar-left::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+    transition: background-color 0.3s;
+}
+
+.editor-sidebar-left::-webkit-scrollbar-thumb:hover {
+    background-color: var(--primary-color);
+}
+
+.editor-sidebar-right {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.editor-sidebar-right::-webkit-scrollbar {
+    width: 6px;
+}
+
+.editor-sidebar-right::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor-sidebar-right::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+    transition: background-color 0.3s;
+}
+
+.editor-sidebar-right::-webkit-scrollbar-thumb:hover {
+    background-color: var(--primary-color);
+}
+
+.editor-sidebar-right {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
 }

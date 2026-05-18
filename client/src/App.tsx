@@ -21,6 +21,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Editor from "./pages/Editor.tsx";
 import Templates from './pages/Templates';
+import ConfirmEmailChange from "./pages/ConfirmEmailChange.tsx";
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 const queryClient = new QueryClient();
@@ -73,10 +74,12 @@ export default function App() {
             {user ? (
               <>
                 <Route path="/home" element={<Home />} />
-                <Route path="*" element={<Navigate to="/home" replace />} />
-                <Route path="/about" element={<About />} />
                 <Route path="/editor/:id" element={<Editor />} />
                 <Route path="/templates" element={<Templates />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
+                <Route path="/email-confirmed" element={<EmailConfirmed />} />
+                <Route path="*" element={<Navigate to="/home" replace />} />
               </>
             ) : (
               <>
@@ -85,8 +88,10 @@ export default function App() {
                 <Route path="/reset-password-request" element={<ResetPasswordRequest />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/email-confirmed" element={<EmailConfirmed />} />
+                <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
                 <Route path="/confirm-email" element={<ConfirmEmailRedirect />} />
                 <Route path="/google-login" element={<GoogleLogin />} />
+                <Route path="/about" element={<About />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
               </>
             )}

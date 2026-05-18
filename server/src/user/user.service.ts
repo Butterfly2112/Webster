@@ -188,7 +188,7 @@ export class UserService {
       include: { user: true },
     });
 
-    if (!tokenRecord || tokenRecord.type !== 'emailChange') {
+    if (!tokenRecord || tokenRecord.type !== TokenType.emailChange) {
       throw new BadRequestException('Invalid token');
     }
 

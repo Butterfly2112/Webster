@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useMutation } from "@tanstack/react-query";
 import { customFetch } from '../api/http';
-import type {User} from "../api/types.ts";
+import type { User } from "../api/types.ts";
 
 export interface SafeUserDto {
     id: number;
@@ -23,10 +23,12 @@ export default function Header() {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const [newUsername, setNewUsername] = useState(user?.username || '');
+    const [newEmail, setNewEmail] = useState(user?.email || '');
     const [newAvatar, setNewAvatar] = useState(user?.avatar_url || '');
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
     const [updateError, setUpdateError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     const handleLogout = () => {
         clearAuth();
@@ -36,17 +38,27 @@ export default function Header() {
     const openEditModal = () => {
         if (user) {
             setNewUsername(user.username);
+            setNewEmail(user.email || '');
             setNewAvatar(user.avatar_url || '');
             setAvatarFile(null);
+
+            // Очищаємо старі повідомлення при новому відкритті
             setUpdateError('');
+            setSuccessMessage('');
+
             setIsModalOpen(true);
         }
     };
 
     const mutation = useMutation({
         mutationFn: async () => {
+            // Очищаємо помилки перед новим запитом
+            setUpdateError('');
+            setSuccessMessage('');
+
             const formData = new FormData();
             formData.append('username', newUsername);
+            formData.append('email', newEmail);
 
             if (avatarFile) {
                 formData.append('file', avatarFile);
@@ -78,10 +90,23 @@ export default function Header() {
             } as unknown as User;
 
             useAuthStore.getState().setAuth(userForStore, currentToken);
-            setIsModalOpen(false);
-            setUpdateError('');
+
+            // Визначаємо текст повідомлення залежно від того, чи змінили пошту
+            if (newEmail !== user?.email) {
+                setSuccessMessage('Profile updated! Verification email sent to your new address.');
+            } else {
+                setSuccessMessage('Profile successfully updated!');
+            }
+
+            // Даємо користувачу 2.5 секунди прочитати повідомлення перед закриттям
+            setTimeout(() => {
+                setIsModalOpen(false);
+                setSuccessMessage('');
+            }, 2500);
+
         },
         onError: (e: any) => {
+            setSuccessMessage(''); // Прибираємо успіх, якщо є помилка
             setUpdateError(e.message || 'Update failed');
         }
     });
@@ -126,6 +151,7 @@ export default function Header() {
                     <nav className="nav-links">
                         <Link to="/templates">Templates</Link>
                         <Link to="/home">Projects</Link>
+                        <Link to="/about">About us</Link>
                     </nav>
                 </div>
 
@@ -143,7 +169,7 @@ export default function Header() {
                                     className="avatar"
                                     onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
                                 />
-                                <span className="username-text">{user.username}</span>
+                                <span className="username-text">{user.login}</span>
                             </div>
 
                             {isDropdownOpen && (
@@ -196,9 +222,20 @@ export default function Header() {
                                 </div>
                             </div>
 
+                            {/* Логін (Тільки для читання) */}
+                            <div className="input-group" style={{ padding: '15px 0', borderTop: '1px solid #e2e8f0' }}>
+                                <label>Login (Cannot be changed)</label>
+                                <input
+                                    type="text"
+                                    value={user?.login || ''}
+                                    disabled
+                                    style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }}
+                                />
+                            </div>
 
-                            <div className="input-group" style={{  padding: '15px 0', borderTop: '1px solid #e2e8f0' }}>
-                                <label>Login</label>
+                            {/* Ім'я */}
+                            <div className="input-group" style={{ paddingBottom: '15px' }}>
+                                <label>Username</label>
                                 <input
                                     type="text"
                                     value={newUsername}
@@ -208,20 +245,33 @@ export default function Header() {
                                 />
                             </div>
 
-                            {updateError && <div className="error-msg" style={{color: 'red', marginBottom: '12px'}}>{updateError}</div>}
+                            {/* Пошта */}
+                            <div className="input-group" style={{ paddingBottom: '15px' }}>
+                                <label>Email</label>
+                                <input
+                                    type="email"
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            {/* БЛОК ПОВІДОМЛЕНЬ ВНИЗУ */}
+                            <div style={{ minHeight: '24px', marginBottom: '15px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+                                {updateError && <div style={{ color: '#ef4444' }}>{updateError}</div>}
+                                {successMessage && <div style={{ color: '#10b981' }}>{successMessage}</div>}
+                            </div>
 
                             <div className="modal-actions"
                                  style={{
                                      display: 'flex',
                                      justifyContent: 'space-between',
-                                     width: '100%',
-                                     marginTop: '20px'
+                                     width: '100%'
                                  }}>
                                 <button
                                     type="submit"
                                     className="button-agree"
-                                    disabled={mutation.isPending}
-
+                                    disabled={mutation.isPending || !!successMessage}
                                 >
                                     {mutation.isPending ? 'Saving...' : 'Save Changes'}
                                 </button>
@@ -230,7 +280,7 @@ export default function Header() {
                                     className="button-disagree"
                                     onClick={() => setIsModalOpen(false)}
                                 >
-                                    Cancel
+                                    {successMessage ? 'Close' : 'Cancel'}
                                 </button>
                             </div>
                         </form>
