@@ -609,20 +609,29 @@ export default function Editor() {
                 h = h * ratio;
             }
 
+            // Додаємо смещение для кожної нової копії
+            const offset = (tempImageIdRef.current - 1) * 30;
+            const newX = Math.max(100 + offset, 50);
+            const newY = Math.max(100 + offset, 50);
+
             setElements((prev) => [...prev, {
                 id: tempId,
                 type: 'image',
                 src: url,
-                x: 100,
-                y: 100,
+                x: newX,
+                y: newY,
                 width: w,
                 height: h,
-                rotation: 0
+                rotation: 0,
+                cloudinaryId: undefined
             }]);
 
             setMode('select');
             setSelectedId(tempId);
             setShowImageMenu(false);
+        };
+        img.onerror = () => {
+            console.error('Failed to load image:', url);
         };
         img.src = url;
     };
