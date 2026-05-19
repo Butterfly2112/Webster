@@ -7,17 +7,17 @@ export default function About() {
 
                 <div className="about-gallery">
                     <img
-                        src="/preview-tools.jpg"
+                        src="/screen1.png"
                         alt="Webster Tools"
                         className="gallery-img img-1"
                     />
                     <img
-                        src="/preview-layers.jpg"
+                        src="/screen2.png"
                         alt="Webster Layers"
                         className="gallery-img img-2"
                     />
                     <img
-                        src="/preview-canvas.jpg"
+                        src="/screen3.png"
                         alt="Webster Canvas"
                         className="gallery-img img-3"
                     />

@@ -294,13 +294,36 @@ const CanvasShape = ({ shapeInfo, onSelect, onChange, dragBoundFunc }: {
     return null;
 };
 
-const CanvasLine = ({ lineInfo, onSelect }: { lineInfo: CanvasElementProps, onSelect: () => void }) => {
+const CanvasLine = ({ lineInfo, onSelect, onChange, dragBoundFunc }: {
+    lineInfo: CanvasElementProps, onSelect: () => void, onChange: (newProps: CanvasElementProps) => void, dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d
+}) => {
     const isEraser = lineInfo.tool === 'eraser';
     const isArrow = lineInfo.tool === 'arrow';
 
     const commonProps = {
-        id: lineInfo.id, points: lineInfo.points || [], stroke: lineInfo.stroke, strokeWidth: lineInfo.strokeWidth, tension: lineInfo.tool === 'pen' ? 0.5 : 0, lineCap: "round" as any, lineJoin: "round" as any,
-        draggable: !isEraser, listening: !isEraser, onClick: onSelect, onTap: onSelect, dash: lineInfo.dash,
+        id: lineInfo.id,
+        x: lineInfo.x || 0, // ТУТ ВАЖЛИВО: читаємо X!
+        y: lineInfo.y || 0, // ТУТ ВАЖЛИВО: читаємо Y!
+        points: lineInfo.points || [],
+        stroke: lineInfo.stroke,
+        strokeWidth: lineInfo.strokeWidth,
+        tension: lineInfo.tool === 'pen' ? 0.5 : 0,
+        lineCap: "round" as any,
+        lineJoin: "round" as any,
+        draggable: !isEraser,
+        listening: !isEraser,
+        onClick: onSelect,
+        onTap: onSelect,
+        dash: lineInfo.dash,
+        dragBoundFunc: dragBoundFunc, // Додаємо магніт для ліній!
+        onDragEnd: (e: Konva.KonvaEventObject<Event>) => {
+            // ТУТ ВАЖЛИВО: Зберігаємо координати після перетягування!
+            onChange({
+                ...lineInfo,
+                x: e.target.x(),
+                y: e.target.y()
+            });
+        }
     };
 
     if (isArrow) return <Arrow {...commonProps} fill={lineInfo.stroke} pointerLength={10} pointerWidth={10} />;
@@ -544,7 +567,13 @@ export default function WorkspaceCanvas({
                         if (el.type === 'image') return <URLImage key={el.id} imageInfo={el} isSelected={el.id === selectedId} onSelect={() => setSelectedId(el.id)} dragBoundFunc={(pos) => calculateDragBound(pos, i)} onChange={(newProps) => { handleElementChange(i, newProps); setGuides([]); }} />;
                         if (el.type === 'text') return <EditableText key={el.id} textInfo={el} isEditing={el.id === editingTextId} onSelect={() => { setSelectedId(el.id); if (editingTextId !== el.id) setEditingTextId(null); }} onDoubleClick={() => setEditingTextId(el.id)} dragBoundFunc={(pos) => calculateDragBound(pos, i)} onChange={(newProps) => { handleElementChange(i, newProps); setGuides([]); }} />;
                         if (el.type === 'shape') return <CanvasShape key={el.id} shapeInfo={el} isSelected={el.id === selectedId} onSelect={() => { setSelectedId(el.id); setEditingTextId(null); }} dragBoundFunc={(pos) => calculateDragBound(pos, i)} onChange={(newProps) => { handleElementChange(i, newProps); setGuides([]); }} />;
-                        if (el.type === 'line') return <CanvasLine key={el.id} lineInfo={el} onSelect={() => { if (mode !== 'draw') setSelectedId(el.id); }} />;
+                        if (el.type === 'line') return <CanvasLine
+                            key={el.id}
+                            lineInfo={el}
+                            onSelect={() => { if (mode !== 'draw') setSelectedId(el.id); }}
+                            dragBoundFunc={(pos) => calculateDragBound(pos, i)}
+                            onChange={(newProps) => { handleElementChange(i, newProps); setGuides([]); }}
+                        />;
                         return null;
                     })}
 

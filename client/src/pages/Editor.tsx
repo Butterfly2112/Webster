@@ -312,7 +312,11 @@ export default function Editor() {
 
                 const currentCanvasData = {
                     className: 'Stage',
-                    attrs: { backgroundColor: canvasBgColor },
+                    aattrs: {
+                        backgroundColor: canvasBgColor,
+                        width: canvasWidth,
+                        height: canvasHeight
+                    },
                     children: elements.filter(el => el.type !== 'placeholder')
                 };
 
@@ -357,8 +361,8 @@ export default function Editor() {
 
         applyEditorSnapshot({
             title: projectData.title || 'Untitled Design',
-            canvasWidth: projectData.width || canvasWidth,
-            canvasHeight: projectData.height || canvasHeight,
+            canvasWidth: projectData.width || parsedCanvas?.attrs?.width || 800,
+            canvasHeight: projectData.height || parsedCanvas?.attrs?.height || 600,
             canvasBgColor: parsedCanvas?.attrs?.backgroundColor || '#ffffff',
             elements: Array.isArray(parsedCanvas?.children) ? parsedCanvas.children : [],
         }, { markAsSaved: true });
@@ -367,7 +371,7 @@ export default function Editor() {
 
         undoStackRef.current = [];
         redoStackRef.current = [];
-    }, [applyEditorSnapshot, canvasHeight, canvasWidth]);
+    }, [applyEditorSnapshot]);
 
     const { data: project, isLoading, isError } = useQuery({
         queryKey: ['project', id],
@@ -622,7 +626,9 @@ export default function Editor() {
 
             currentCanvasData.attrs = {
                 ...currentCanvasData.attrs,
-                backgroundColor: updateData.bgColor
+                backgroundColor: updateData.bgColor,
+                width: updateData.width,
+                height: updateData.height
             };
 
             currentCanvasData.children = updateData.elements;
@@ -685,7 +691,9 @@ export default function Editor() {
 
             currentCanvasData.attrs = {
                 ...currentCanvasData.attrs,
-                backgroundColor: canvasBgColor
+                backgroundColor: canvasBgColor,
+                width: canvasWidth,
+                height: canvasHeight
             };
 
             currentCanvasData.children = elements;
