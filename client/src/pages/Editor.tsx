@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/auth';
 import WorkspaceCanvas, { type CanvasElementProps } from '../components/WorkspaceCanvas';
 import FontUploadModal from '../components/FontUploadModal';
 import FontDeleteModal from '../components/FontDeleteModal';
+import ShareModal from '../components/ShareModal';
 import { getFonts } from '../api/font';
 import type { Font } from '../api/types';
 
@@ -224,6 +225,7 @@ export default function Editor() {
     const [isExporting, setIsExporting] = useState(false);
     const [showFontUploadModal, setShowFontUploadModal] = useState(false);
     const [showFontDeleteModal, setShowFontDeleteModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const [fonts, setFonts] = useState<Font[]>([]);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1085,7 +1087,6 @@ export default function Editor() {
         if (element.type === 'image') return 'Image';
 
         if (element.type === 'line') {
-            if (element.tool === 'eraser') return 'Eraser stroke';
             if (element.tool === 'arrow') return 'Arrow';
             if (element.tool === 'dashed') return 'Dashed line';
             return 'Line';
@@ -1095,7 +1096,7 @@ export default function Editor() {
     };
 
     const visibleLayers = [...elements]
-        .filter(el => Boolean(el) && el.type)
+        .filter(el => Boolean(el) && el.type && !(el.type === 'line' && el.tool === 'eraser'))
         .map((element, index) => ({ element, index }))
         .reverse();
 
@@ -1254,6 +1255,13 @@ export default function Editor() {
                             </div>
                         )}
                     </div>
+                    <button
+                        className="button-agree"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowShareModal(true)}
+                    >
+                        Share
+                    </button>
                     <img
                         src={user?.avatar_url || '/default-avatar.png'}
                         alt="User"
@@ -2040,6 +2048,14 @@ export default function Editor() {
                     onSuccess={() => {
                         getFonts().then(setFonts).catch(err => console.error('Failed to reload fonts:', err));
                     }}
+                />
+            )}
+
+            {showShareModal && id && (
+                <ShareModal
+                    projectTitle={title}
+                    projectId={id}
+                    onClose={() => setShowShareModal(false)}
                 />
             )}
 
