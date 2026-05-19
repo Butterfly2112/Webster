@@ -5,6 +5,10 @@ import { jsPDF } from 'jspdf';
 import { customFetch } from '../api/http';
 import { useAuthStore } from '../store/auth';
 import WorkspaceCanvas, { type CanvasElementProps } from '../components/WorkspaceCanvas';
+import FontUploadModal from '../components/FontUploadModal';
+import FontDeleteModal from '../components/FontDeleteModal';
+import { getFonts } from '../api/font';
+import type { Font } from '../api/types';
 
 type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
 
@@ -218,6 +222,9 @@ export default function Editor() {
     const [showImageMenu, setShowImageMenu] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [showFontUploadModal, setShowFontUploadModal] = useState(false);
+    const [showFontDeleteModal, setShowFontDeleteModal] = useState(false);
+    const [fonts, setFonts] = useState<Font[]>([]);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const loadedProjectIdRef = useRef<number | null>(null);
@@ -438,6 +445,56 @@ export default function Editor() {
         const timeout = setTimeout(() => setHistoryMessage(null), 3000);
         return () => clearTimeout(timeout);
     }, [historyMessage]);
+
+    useEffect(() => {
+        // Update @font-face rules whenever fonts change
+        const customFonts = fonts.filter(font => font.owner_id !== null);
+        
+        // Remove existing custom font styles
+        const existingStyle = document.getElementById('custom-fonts-style');
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+
+        // Create new style element with updated fonts
+        if (customFonts.length > 0) {
+            const styleElement = document.createElement('style');
+            styleElement.id = 'custom-fonts-style';
+            
+            let fontFaceRules = '';
+            customFonts.forEach((font) => {
+                const formatMap: { [key: string]: string } = {
+                    'truetype': 'truetype',
+                    'woff': 'woff',
+                    'woff2': 'woff2',
+                    'opentype': 'opentype',
+                };
+                const format = formatMap[font.format] || 'truetype';
+                fontFaceRules += `
+                    @font-face {
+                        font-family: "${font.name}";
+                        src: url("${font.url}") format("${format}");
+                    }
+                `;
+            });
+
+            styleElement.textContent = fontFaceRules;
+            document.head.appendChild(styleElement);
+        }
+    }, [fonts]);
+
+    useEffect(() => {
+        const loadFonts = async () => {
+            try {
+                const loadedFonts = await getFonts();
+                setFonts(loadedFonts);
+            } catch (err) {
+                console.error('Failed to load fonts:', err);
+            }
+        };
+
+        loadFonts();
+    }, []);
 
     const uploadAssetMutation = useMutation({
         mutationFn: async ({ formData, tempId, w, h }: { formData: FormData, tempId: string, w: number, h: number }) => {
@@ -1663,31 +1720,41 @@ export default function Editor() {
                                                     padding: '8px',
                                                     borderRadius: '6px',
                                                     border: '1px solid #e2e8f0',
-                                                    marginBottom: '10px',
-                                                    fontFamily: selectedElement.fontFamily || 'Arial'
+                                                    marginBottom: '10px'
                                                 }}
                                             >
-                                                <option value="Arial">Arial</option>
-                                                <option value="Courier New">Courier New</option>
-                                                <option value="Georgia">Georgia</option>
-                                                <option value="Times New Roman">Times New Roman</option>
-                                                <option value="Verdana">Verdana</option>
-                                                <option value="Tahoma">Tahoma</option>
-                                                <option value="Trebuchet MS">Trebuchet MS</option>
+                                                <optgroup label="System Fonts">
+                                                    <option value="Arial" style={{ fontFamily: 'Arial' }}>Arial</option>
+                                                    <option value="Courier New" style={{ fontFamily: 'Courier New' }}>Courier New</option>
+                                                    <option value="Georgia" style={{ fontFamily: 'Georgia' }}>Georgia</option>
+                                                    <option value="Times New Roman" style={{ fontFamily: 'Times New Roman' }}>Times New Roman</option>
+                                                    <option value="Verdana" style={{ fontFamily: 'Verdana' }}>Verdana</option>
+                                                    <option value="Tahoma" style={{ fontFamily: 'Tahoma' }}>Tahoma</option>
+                                                    <option value="Trebuchet MS" style={{ fontFamily: 'Trebuchet MS' }}>Trebuchet MS</option>
+                                                </optgroup>
+                                                {fonts.length > 0 && (
+                                                    <optgroup label="Custom Fonts">
+                                                        {fonts.map((font) => (
+                                                            <option key={font.id} value={font.name} style={{ fontFamily: font.name }}>
+                                                                {font.name}
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
                                             </select>
 
                                             <div style={{ display: 'flex', gap: '8px' }}>
                                                 <button
                                                     className="button-secondary"
                                                     style={{ flex: 1, fontSize: '11px', padding: '6px' }}
-                                                    onClick={() => console.log('Upload font trigger')}
+                                                    onClick={() => setShowFontUploadModal(true)}
                                                 >
                                                     Upload Font
                                                 </button>
                                                 <button
                                                     className="button-secondary"
                                                     style={{ flex: 1, fontSize: '11px', padding: '6px', color: '#ef4444' }}
-                                                    onClick={() => console.log('Delete font trigger')}
+                                                    onClick={() => setShowFontDeleteModal(true)}
                                                 >
                                                     Delete Font
                                                 </button>
@@ -1946,6 +2013,25 @@ export default function Editor() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showFontUploadModal && (
+                <FontUploadModal
+                    onClose={() => setShowFontUploadModal(false)}
+                    onSuccess={() => {
+                        getFonts().then(setFonts).catch(err => console.error('Failed to reload fonts:', err));
+                    }}
+                />
+            )}
+
+            {showFontDeleteModal && (
+                <FontDeleteModal
+                    fonts={fonts}
+                    onClose={() => setShowFontDeleteModal(false)}
+                    onSuccess={() => {
+                        getFonts().then(setFonts).catch(err => console.error('Failed to reload fonts:', err));
+                    }}
+                />
             )}
 
         </div>
