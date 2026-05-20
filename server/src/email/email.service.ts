@@ -36,7 +36,7 @@ export class EmailService {
         <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
           <tr>
             <td align="center" style="background-color: ${this.colors.primary}; padding: 30px 20px;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px; font-weight: 800;">Webster</h1>
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px; font-weight: 800;">Brawy</h1>
             </td>
           </tr>
           
@@ -50,7 +50,7 @@ export class EmailService {
           <tr>
             <td align="center" style="background-color: #f8fafc; padding: 20px; border-top: 1px solid #eeeeee;">
               <p style="color: ${this.colors.muted}; font-size: 13px; margin: 0;">
-                © ${new Date().getFullYear()} Webster. All rights reserved.<br/>
+                © ${new Date().getFullYear()} Brawy. All rights reserved.<br/>
                 If you have any questions, contact our support team.
               </p>
             </td>
@@ -85,7 +85,7 @@ export class EmailService {
 
     const content = `
       <p>Hello <b>${username}</b>,</p>
-      <p>Welcome to Webster! We're thrilled to have you on board. To get started and unlock all features, please confirm your email address by clicking the button below.</p>
+      <p>Welcome to Brawy! We're thrilled to have you on board. To get started and unlock all features, please confirm your email address by clicking the button below.</p>
       ${this.getButtonHtml(url, 'Confirm Email')}
       <p style="color: ${this.colors.muted}; font-size: 14px; margin-top: 30px;">
         If the button doesn't work, copy and paste this link into your browser:<br/>
@@ -94,9 +94,9 @@ export class EmailService {
     `;
 
     const info = await this.transporter.sendMail({
-      from: `"Webster" <${this.configService.get('SMTP_USER')}>`,
+      from: `"Brawy" <${this.configService.get('SMTP_USER')}>`,
       to: email,
-      subject: 'Welcome to Webster! Please confirm your email',
+      subject: 'Welcome to Brawy! Please confirm your email',
       html: this.getHtmlTemplate('Confirm your registration', content),
     });
 
@@ -109,15 +109,15 @@ export class EmailService {
   ): Promise<void> {
     const content = `
       <p>Hello <b>${username}</b>,</p>
-      <p>Welcome to Webster! You have successfully registered using your Google account.</p>
+      <p>Welcome to Brawy! You have successfully registered using your Google account.</p>
       <p>Your workspace is ready. You can now start creating, editing, and managing your web projects easily.</p>
       ${this.getButtonHtml(`http://${this.host}:${this.port}/home`, 'Go to Dashboard')}
     `;
 
     const info = await this.transporter.sendMail({
-      from: `"Webster" <${this.configService.get('SMTP_USER')}>`,
+      from: `"Brawy" <${this.configService.get('SMTP_USER')}>`,
       to: email,
-      subject: 'Welcome to Webster!',
+      subject: 'Welcome to Brawy!',
       html: this.getHtmlTemplate('Registration Successful', content),
     });
 
@@ -135,7 +135,7 @@ export class EmailService {
 
     const content = `
       <p>Hello <b>${username}</b>,</p>
-      <p>We received a request to reset the password for your Webster account. You can securely set a new password by clicking the button below:</p>
+      <p>We received a request to reset the password for your Brawy account. You can securely set a new password by clicking the button below:</p>
       ${this.getButtonHtml(url, 'Reset Password')}
       <div style="background-color: #fff1f2; padding: 15px; border-radius: 8px; border-left: 4px solid #e11d48; margin-top: 30px;">
         <p style="margin: 0; color: #e11d48; font-size: 14px;">
@@ -145,9 +145,9 @@ export class EmailService {
     `;
 
     const info = await this.transporter.sendMail({
-      from: `"Webster" <${this.configService.get('SMTP_USER')}>`,
+      from: `"Brawy" <${this.configService.get('SMTP_USER')}>`,
       to: email,
-      subject: 'Password Reset Request - Webster',
+      subject: 'Password Reset Request - Brawy',
       html: this.getHtmlTemplate('Reset your password', content),
     });
 
@@ -165,7 +165,7 @@ export class EmailService {
 
     const content = `
       <p>Hello <b>${username}</b>,</p>
-      <p>We received a request to change your Webster account email address to this one. To confirm the change, please click the button below:</p>
+      <p>We received a request to change your Brawy account email address to this one. To confirm the change, please click the button below:</p>
       ${this.getButtonHtml(url, 'Confirm Email Change')}
       <div style="background-color: #fff1f2; padding: 15px; border-radius: 8px; border-left: 4px solid #e11d48; margin-top: 30px;">
         <p style="margin: 0; color: #e11d48; font-size: 14px;">
@@ -175,9 +175,9 @@ export class EmailService {
     `;
 
     const info = await this.transporter.sendMail({
-      from: `"Webster" <${this.configService.get('SMTP_USER')}>`,
+      from: `"Brawy" <${this.configService.get('SMTP_USER')}>`,
       to: newEmail,
-      subject: 'Confirm your new email address - Webster',
+      subject: 'Confirm your new email address - Brawy',
       html: this.getHtmlTemplate('Email Change Request', content),
     });
 

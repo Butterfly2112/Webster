@@ -15,12 +15,14 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiConsumes,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
 import { ProjectService } from './project.service';
@@ -40,6 +42,7 @@ import {
   UpdateProjectDto,
   UpdateProjectDtoD,
 } from './dto/update-project.dto';
+import { OptionalAuth } from 'src/auth/decorators/optional-auth.decorator';
 
 @ApiTags('Project')
 @UseGuards(JwtAccessGuard)
@@ -72,6 +75,13 @@ export class ProjectController {
     return await this.projectService.getTemplates(userId);
   }
 
+  @ApiOperation({ summary: 'Get all shared user projects' })
+  @ApiOkResponse({ type: ProjectCardDto, isArray: true })
+  @Get('shared')
+  async getSharedProjects(@CurrentUser('sub') userId: number) {
+    return await this.projectService.getAllSharedProjects(userId);
+  }
+
   @ApiOperation({ summary: 'Create new project (optionally from template)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: CreateProjectDtoD })
@@ -94,7 +104,11 @@ export class ProjectController {
     return await this.projectService.createProject(dto, userId);
   }
 
-  @ApiOperation({ summary: 'Get project by id' })
+  @ApiOperation({
+    summary: 'Get project by id',
+    description:
+      'Works on both authorized and unauthorized users (if project shared)',
+  })
   @ApiOkResponse({ type: SafeProjectDto })
   @ApiNotFoundResponse({ description: 'Project was not found' })
   @ApiForbiddenResponse({
@@ -106,10 +120,11 @@ export class ProjectController {
     type: Number,
     example: 1,
   })
+  @OptionalAuth()
   @Get(':id')
   async getProject(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('sub') userId: number,
+    @CurrentUser('sub') userId: number | null,
   ) {
     return await this.projectService.getProjectById(id, userId);
   }
@@ -155,6 +170,7 @@ export class ProjectController {
   }
 
   @ApiOperation({ summary: 'Get project version history' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
   @ApiOkResponse({ type: CardProjectHistoryDto, isArray: true })
@@ -167,6 +183,7 @@ export class ProjectController {
   }
 
   @ApiOperation({ summary: 'Restore past version of project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiBody({
     type: RestoreVersionDto,
   })
@@ -189,6 +206,7 @@ export class ProjectController {
   }
 
   @ApiOperation({ summary: 'Get project assets' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
   @ApiOkResponse({ type: SafeAssetDto, isArray: true })
@@ -201,6 +219,7 @@ export class ProjectController {
   }
 
   @ApiOperation({ description: 'Upload new asset to project assets' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiConsumes('multipart/form-data')
   @ApiNotFoundResponse({ description: 'Project not found' })
   @ApiForbiddenResponse({ description: 'Access denied' })
@@ -218,6 +237,43 @@ export class ProjectController {
       userId,
       file,
     );
+  }
+
+  @ApiOperation({
+    summary: 'Share project',
+    description: 'Make project available to be seen by someone else',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Project shared successfully' })
+  @ApiConflictResponse({ description: 'Project already shared' })
+  @ApiNotFoundResponse({ description: 'Project not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @Patch(':id/share')
+  async shareProject(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) projectId: number,
+  ) {
+    await this.projectService.shareProject(projectId, userId);
+    return {
+      message: 'Project shared successfully',
+    };
+  }
+
+  @ApiOperation({ summary: 'Unshare project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Project unshared successfully' })
+  @ApiConflictResponse({ description: 'Project not shared already' })
+  @ApiNotFoundResponse({ description: 'Project not found' })
+  @ApiForbiddenResponse({ description: 'Access denied' })
+  @Patch(':id/unshare')
+  async unshareProject(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) projectId: number,
+  ) {
+    await this.projectService.unshareProject(projectId, userId);
+    return {
+      message: 'Project unshared successfully',
+    };
   }
 
   @ApiOperation({ description: 'Get asset by id' })

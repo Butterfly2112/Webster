@@ -48,6 +48,11 @@ export class SafeProjectDto {
   isTemplate: boolean;
 
   @ApiProperty({
+    description: 'Defines if this project available to the public',
+  })
+  isShared: boolean;
+
+  @ApiProperty({
     description: 'When project was created',
   })
   createdAt: Date;
@@ -112,7 +117,7 @@ export class SafeAssetDto {
 
   @ApiProperty({
     description: 'Url of the image',
-    example: 'https://example.com/webster/assets/applepie',
+    example: 'https://example.com/brawy/assets/applepie',
   })
   url: string;
 

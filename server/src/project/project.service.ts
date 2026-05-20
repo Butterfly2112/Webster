@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -81,7 +82,7 @@ export class ProjectService {
 
   async getProjectById(
     projectId: number,
-    userId: number,
+    userId: number | null,
   ): Promise<SafeProjectDto> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -91,7 +92,10 @@ export class ProjectService {
     if (!project) {
       throw new NotFoundException('Project not found');
     }
-    if (project.owner_id !== userId) {
+    if (project.owner_id === userId) {
+      return this.toSafeProject(project as Project & { assets: Asset[] });
+    }
+    if (!project.is_shared) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -313,6 +317,42 @@ export class ProjectService {
     await this.prisma.asset.delete({ where: { id: assetId } });
   }
 
+  async shareProject(projectId: number, userId: number): Promise<void> {
+    const project = await this.checkRights(projectId, userId);
+    if (project.is_shared) {
+      throw new ConflictException('Project already shared');
+    }
+
+    await this.prisma.project.update({
+      where: { id: project.id },
+      data: {
+        is_shared: true,
+      },
+    });
+  }
+
+  async unshareProject(projectId: number, userId: number): Promise<void> {
+    const project = await this.checkRights(projectId, userId);
+    if (!project.is_shared) {
+      throw new ConflictException('Project not shared already');
+    }
+
+    await this.prisma.project.update({
+      where: { id: project.id },
+      data: {
+        is_shared: false,
+      },
+    });
+  }
+
+  async getAllSharedProjects(userId: number): Promise<ProjectCardDto[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { AND: [{ owner_id: userId }, { is_shared: true }] },
+    });
+
+    return projects.map(this.toProjectCard);
+  }
+
   private async checkRights(
     projectId: number,
     userId: number,
@@ -405,6 +445,7 @@ export class ProjectService {
       height: project.height,
       thumbnailUrl: project.thumbnail_url || undefined,
       isTemplate: project.is_template,
+      isShared: project.is_shared,
       createdAt: project.created_at,
       updatedAt: project.updated_at,
       ownerId: project.owner_id,
@@ -421,6 +462,7 @@ export class ProjectService {
       height: project.height,
       thumbnailUrl: project.thumbnail_url || undefined,
       isTemplate: project.is_template,
+      isShared: project.is_shared,
       updatedAt: project.updated_at,
       ownerId: project.owner_id,
     };

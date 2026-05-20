@@ -29,7 +29,7 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Webster API')
+    .setTitle('Brawy API')
     .setDescription('Documentation for REST API')
     .setVersion('1.0')
     .addBearerAuth()
