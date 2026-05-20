@@ -211,7 +211,15 @@ export default function Editor() {
         'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop',
         'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop',
         'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=200&auto=format&fit=crop',
-        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop'
+        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop',
+        '/money.png',
+        '/ballons.png',
+        '/butterflies.png',
+        '/butterfly.png',
+        '/butterflywings.png',
+        '/like.png',
+        '/star.webp',
+        '/stars.png'
     ];
 
     const [showShapesMenu, setShowShapesMenu] = useState(false);
