@@ -344,6 +344,8 @@ export default function WorkspaceCanvas({
     const trRef = useRef<Konva.Transformer>(null);
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const isDrawing = useRef(false);
+    const isPanning = useRef(false);
+    const lastPanPos = useRef<Konva.Vector2d | null>(null);
 
     const clipboardRef = useRef<CanvasElementProps | null>(null);
 
@@ -367,14 +369,19 @@ export default function WorkspaceCanvas({
     useEffect(() => { if (onStageReady && stageRef.current) onStageReady(stageRef.current); }, [onStageReady]);
 
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+        const stage = e.target.getStage();
+        // start panning when clicking/tapping on empty stage (not in draw mode)
         if (mode !== 'draw') {
-            if (e.target === e.target.getStage()) {
+            if (e.target === stage) {
                 setSelectedId(null);
                 setEditingTextId(null);
+                isPanning.current = true;
+                lastPanPos.current = stage.getPointerPosition() || null;
+                try { stage.container().style.cursor = 'grabbing'; } catch {}
+                return;
             }
             return;
         }
-        const stage = e.target.getStage();
         const pos = stage?.getPointerPosition();
         if (!pos) return;
 
@@ -396,9 +403,24 @@ export default function WorkspaceCanvas({
     };
 
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-        if (!isDrawing.current || mode !== 'draw') return;
         const stage = e.target.getStage();
         const pos = stage?.getPointerPosition();
+
+        // handle panning when user grabbed empty stage
+        if (isPanning.current && mode !== 'draw') {
+            if (!pos || !lastPanPos.current) return;
+            const dx = pos.x - lastPanPos.current.x;
+            const dy = pos.y - lastPanPos.current.y;
+            setStagePos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+            lastPanPos.current = pos;
+            try { stage.container().style.cursor = 'grabbing'; } catch {}
+            return;
+        }
+
+        if (!isDrawing.current || mode !== 'draw') return;
+        
+        
+        if (!pos) return;
         if (!pos) return;
 
         const x = (pos.x - stagePos.x) / stageScale;
@@ -416,7 +438,12 @@ export default function WorkspaceCanvas({
         });
     };
 
-    const handleMouseUp = () => { isDrawing.current = false; };
+    const handleMouseUp = () => {
+        isDrawing.current = false;
+        isPanning.current = false;
+        lastPanPos.current = null;
+        try { const stage = stageRef.current; if (stage) stage.container().style.cursor = ''; } catch {}
+    };
     const handleElementChange = (index: number, newProps: CanvasElementProps) => { const newElements = [...elements]; newElements[index] = newProps; setElements(newElements); };
 
     const calculateDragBound = (pos: Konva.Vector2d, index: number) => {
@@ -548,8 +575,27 @@ export default function WorkspaceCanvas({
     const editingElement = elements.find(el => el.id === editingTextId);
     const selectedElement = elements.find(el => el.id === selectedId);
 
+    const zoomAt = (direction: number) => {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const oldScale = stage.scaleX();
+        const pointer = { x: width / 2, y: height / 2 };
+
+        const mousePointTo = {
+            x: (pointer.x - stage.x()) / oldScale,
+            y: (pointer.y - stage.y()) / oldScale,
+        };
+
+        const scaleBy = 1.1;
+        const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+        if (newScale < 0.1 || newScale > 5) return;
+
+        setStageScale(newScale);
+        setStagePos({ x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
+    };
+
     return (
-        <>
+        <div style={{ position: 'relative', width: width, height: height }}>
             <Stage
                 width={width} height={height} ref={stageRef}
                 scaleX={stageScale}
@@ -625,6 +671,26 @@ export default function WorkspaceCanvas({
                     }}
                 />
             )}
-        </>
-    );
-}
+
+            <div style={{ position: 'absolute', top: 0, right: -50, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: 'rgba(128,128,128,0.22)', borderRadius: 6, padding: '4px 6px', zIndex: 20 }}>
+                <button
+                    aria-label="Zoom in"
+                    onClick={() => zoomAt(1)}
+                    style={{ width: 28, height: 28, borderRadius: 4, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 14 }}
+                >
+                    +
+                </button>
+
+                <div style={{ minWidth: 36, textAlign: 'center', color: '#fff', fontWeight: 600, fontSize: 13 }}>{Math.round(stageScale * 100)}%</div>
+
+                <button
+                    aria-label="Zoom out"
+                    onClick={() => zoomAt(-1)}
+                    style={{ width: 28, height: 28, borderRadius: 4, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 14 }}
+                >
+                    −
+                </button>
+            </div>
+        </div>
+        );
+    }
