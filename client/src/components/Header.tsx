@@ -143,7 +143,7 @@ export default function Header() {
                 <div className="header-left">
                     <Link to="/" className="logo-block">
                         <img src="/logo.png" alt="logo" className="logo-img" />
-                        <span className="logo-text">Webster</span>
+                        <span className="logo-text">Brawy</span>
                     </Link>
                 </div>
 

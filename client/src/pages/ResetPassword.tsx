@@ -38,7 +38,7 @@ export default function ResetPassword() {
           <div className="login-left">
             <div className="welcome-content">
               <h1>Set New Password</h1>
-              <p>You're almost there! Choose a strong password to keep your Webster account secure.</p>
+              <p>You're almost there! Choose a strong password to keep your Brawy account secure.</p>
             </div>
           </div>
 

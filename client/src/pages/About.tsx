@@ -8,26 +8,26 @@ export default function About() {
                 <div className="about-gallery">
                     <img
                         src="/screen1.png"
-                        alt="Webster Tools"
+                        alt="Brawy Tools"
                         className="gallery-img img-1"
                     />
                     <img
                         src="/screen2.png"
-                        alt="Webster Layers"
+                        alt="Brawy Layers"
                         className="gallery-img img-2"
                     />
                     <img
                         src="/screen3.png"
-                        alt="Webster Canvas"
+                        alt="Brawy Canvas"
                         className="gallery-img img-3"
                     />
                 </div>
 
                 <div className="about-text-section">
-                    <h4 className="subtitle">About Webster</h4>
+                    <h4 className="subtitle">About Brawy</h4>
                     <h1>Create masterpieces right in your browser</h1>
                     <p className="main-description">
-                        Webster is a modern browser-based graphics editor designed to make
+                        Brawy is a modern browser-based graphics editor designed to make
                         the process of creating graphics fast, convenient, and accessible
                         to everyone, without the need to install heavy programs.
                     </p>

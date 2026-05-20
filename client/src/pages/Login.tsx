@@ -110,7 +110,7 @@ export default function Login() {
           {/* ЛІВА ЧАСТИНА: Привітання та Фото */}
           <div className="login-left">
             <div className="welcome-content">
-              <h1>Welcome to Webster!</h1>
+              <h1>Welcome to Brawy!</h1>
               <p>Your ultimate creative platform for building web magic. Start your journey today!</p>
             </div>
           </div>

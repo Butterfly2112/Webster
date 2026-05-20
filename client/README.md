@@ -1,4 +1,4 @@
-# Webster Client
+# Brawy Client
 
 ## How to Run the Client
 

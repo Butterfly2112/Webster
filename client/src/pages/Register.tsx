@@ -34,7 +34,7 @@ export default function Register() {
                 {/* ЛІВА ЧАСТИНА: Привітання та Фото (аналогічно логіну) */}
                 <div className="login-left">
                     <div className="welcome-content">
-                        <h1>Join Webster!</h1>
+                        <h1>Join Brawy!</h1>
                         <p>Create your account and start building amazing web projects with our powerful editor.</p>
                         {/* Тут можна додати інше фото або залишити той самий стиль */}
                     </div>

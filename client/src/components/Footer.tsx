@@ -9,11 +9,11 @@ export default function Footer() {
                 <div className="footer-section" style={{  maxWidth: '300px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px'}}>
                         <img src="/logo.png" alt="logo" style={{width: '40px', height: '40px', borderRadius: '10px'}}/>
-                        <span style={{fontSize: '18px', fontWeight: 'bold'}}>Webster</span>
+                        <span style={{fontSize: '18px', fontWeight: 'bold'}}>Brawy</span>
                     </div>
 
                     <p className="footer-description" style={{ fontSize: '14px', lineHeight: '1.5'}}>
-                        Webster is an online platform for creating, editing, and managing
+                        Brawy is an online platform for creating, editing, and managing
                         web projects. Choose templates, create your own designs, and
                         implement your ideas quickly and conveniently.
                     </p>
@@ -22,7 +22,7 @@ export default function Footer() {
                 {/* CONTACTS */}
                 <div className="footer-section" style={{  maxWidth: '300px' }}>
                     <h4>Contacts</h4>
-                    <p>Email: support@webster.com</p>
+                    <p>Email: support@brawy.com</p>
                     <p>Phone: +380 00 000 00 00</p>
                     <p>Ukraine</p>
                 </div>
@@ -41,7 +41,7 @@ export default function Footer() {
 
             {/* BOTTOM */}
             <div className="footer-bottom">
-                <p>© {new Date().getFullYear()} Webster. All rights reserved.</p>
+                <p>© {new Date().getFullYear()} Brawy. All rights reserved.</p>
             </div>
         </footer>
     );
