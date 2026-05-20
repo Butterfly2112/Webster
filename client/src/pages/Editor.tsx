@@ -429,6 +429,24 @@ export default function Editor() {
         enabled: !!id && id !== 'new' && showImageMenu,
     });
 
+    const { data: templatesList = [], isLoading: isTemplatesLoading } = useQuery({
+        queryKey: ['templates'],
+        queryFn: async () => {
+            try {
+                const response = await customFetch('/api/project/templates');
+                if (!response.ok) throw new Error('Failed to fetch templates');
+                const json = await response.json();
+                if (Array.isArray(json) && json.length > 0) return json;
+                throw new Error('Empty templates');
+            } catch (err) {
+                const fallback = await fetch('/templates.json');
+                if (!fallback.ok) throw err;
+                return fallback.json();
+            }
+        },
+        enabled: showTemplateMenu,
+    });
+
     useEffect(() => {
         if (project && loadedProjectIdRef.current !== project.id) {
             applyProjectState(project);
@@ -1620,6 +1638,41 @@ export default function Editor() {
                                         {templateMessage.text}
                                     </span>
                                 )}
+                                <div style={{ marginTop: 12, width: '100%' }}>
+                                    {isTemplatesLoading && <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>Loading templates...</div>}
+                                    {!isTemplatesLoading && Array.isArray(templatesList) && templatesList.length > 0 && (
+                                        <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                                            {templatesList.map((tpl: any) => (
+                                                <div key={tpl.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e6eaf0' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <div style={{ width: 48, height: 36, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#64748b' }}>
+                                                            {tpl.thumbnailUrl ? <img src={tpl.thumbnailUrl} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : 'No preview'}
+                                                        </div>
+                                                        <div style={{ fontSize: 13 }}>{tpl.title}</div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <button className="button-secondary" onClick={() => {
+                                                            const canvas = tpl.canvas || tpl.canvas_data || tpl.canvasData || {};
+                                                            const snap: EditorSnapshot = {
+                                                                title: tpl.title || 'Template',
+                                                                canvasWidth: canvas.width || tpl.width || 800,
+                                                                canvasHeight: canvas.height || tpl.height || 600,
+                                                                canvasBgColor: canvas.background || '#ffffff',
+                                                                elements: Array.isArray(canvas.elements) ? canvas.elements : [],
+                                                            };
+                                                            applyEditorSnapshot(snap);
+                                                            setTemplateMessage({ text: 'Template applied to canvas', type: 'success' });
+                                                            setTimeout(() => setTemplateMessage(null), 2000);
+                                                        }}>Apply</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {!isTemplatesLoading && (!templatesList || templatesList.length === 0) && (
+                                        <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 8 }}>No templates available</div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

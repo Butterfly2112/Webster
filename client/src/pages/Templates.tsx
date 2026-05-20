@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { customFetch } from '../api/http';
 import Header from '../components/Header';
@@ -18,13 +19,32 @@ export interface TemplateCard {
 
 export default function Templates() {
     const navigate = useNavigate();
+    const [usingLocal, setUsingLocal] = useState(false);
 
     const { data: templates, isLoading, isError } = useQuery<TemplateCard[]>({
         queryKey: ['templates'],
         queryFn: async () => {
-            const response = await customFetch('/api/project/templates');
-            if (!response.ok) throw new Error('Failed to fetch templates');
-            return response.json();
+            try {
+                const response = await customFetch('/api/project/templates');
+                if (!response.ok) throw new Error('Failed to fetch templates');
+                const json = await response.json();
+                if (Array.isArray(json) && json.length > 0) {
+                    setUsingLocal(false);
+                    return json;
+                }
+                // fallback to local file when empty
+                throw new Error('Empty templates from API');
+            } catch {
+                try {
+                    const fallback = await fetch('/templates.json');
+                    if (!fallback.ok) return [];
+                    const local = await fallback.json();
+                    setUsingLocal(true);
+                    return local;
+                } catch {
+                    return [];
+                }
+            }
         },
     });
 
@@ -62,6 +82,12 @@ export default function Templates() {
                             <p className="subtitle">Choose a starting point for your next design</p>
                         </div>
                     </header>
+
+                    {usingLocal && (
+                        <div style={{ padding: '8px 12px', background: '#fff7ed', color: '#92400e', borderRadius: 6, marginBottom: 12, textAlign: 'center' }}>
+                            Using local system templates (no backend seed)
+                        </div>
+                    )}
 
                     <div className="projects-grid">
                         {isLoading && <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--primary-color)' }}>Loading templates...</p>}
